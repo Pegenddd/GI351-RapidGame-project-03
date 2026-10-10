@@ -3,10 +3,9 @@ using UnityEngine;
 
 /// <summary>
 /// Controls the bouncing ball:
-/// - Bounces off arena walls with speed retention.
-/// - Pierces through enemies (บอลทะลุ) without deflecting or stopping.
+/// - Bounces off arena walls, enemies, and pinball bumpers with speed retention.
 /// - Inflicts damage and triggers blood VFX on enemies.
-/// - Features dynamic trail and impact VFX.
+/// - Features dynamic trail, impact VFX, and player magnet/attachment support.
 /// </summary>
 public class BouncingBall : MonoBehaviour
 {
@@ -30,8 +29,12 @@ public class BouncingBall : MonoBehaviour
     private MaterialPropertyBlock propBlock;
     private Rigidbody rb;
 
-    // Cooldown per enemy to prevent multi-hit on consecutive frames while piercing through
-    private readonly Dictionary<EnemyController, float> hitCooldowns = new Dictionary<EnemyController, float>();
+    // Magnet & Attachment state variables
+    private bool isAttachedToPlayer = false;
+    private Transform playerTransform;
+
+    // Cooldown per enemy to prevent multi-hit on consecutive frames (เปลี่ยนจาก EnemyController เป็น EnemyBase)
+    private readonly Dictionary<EnemyBase, float> hitCooldowns = new Dictionary<EnemyBase, float>();
 
     private void Awake()
     {
@@ -43,7 +46,7 @@ public class BouncingBall : MonoBehaviour
         if (rb != null)
         {
             rb.useGravity = false;
-            rb.isKinematic = true; // Code-driven physics for crisp, reliable bounces
+            rb.isKinematic = true;
         }
 
         ballRenderer = GetComponent<Renderer>();
@@ -78,32 +81,53 @@ public class BouncingBall : MonoBehaviour
 
     private void Update()
     {
-        // Decay boosted speed gradually towards base speed
+        if (isAttachedToPlayer)
+        {
+            if (playerTransform != null)
+            {
+                transform.position = playerTransform.position + playerTransform.forward * 1.2f + Vector3.up * 0.6f;
+            }
+            return;
+        }
+
         if (currentSpeed > baseSpeed)
         {
             currentSpeed = Mathf.MoveTowards(currentSpeed, baseSpeed, speedDecayRate * Time.deltaTime);
             UpdateVisuals();
         }
 
-        // Move ball on XZ plane
         Vector3 moveDelta = moveDirection * (currentSpeed * Time.deltaTime);
         transform.position += moveDelta;
 
-        // Keep ball at constant elevation
         Vector3 pos = transform.position;
         pos.y = 0.6f;
         transform.position = pos;
 
-        // Update cooldowns
         UpdateCooldowns();
-
-        // Check sphere collisions for walls and enemies
         CheckCollisions(moveDelta);
+    }
+
+    public void StartMagnetPull()
+    {
+        isAttachedToPlayer = false;
+    }
+
+    public void SetAttachedToPlayer(Transform player)
+    {
+        isAttachedToPlayer = true;
+        playerTransform = player;
+        currentSpeed = 0f;
+    }
+
+    public void ReleaseFromPlayer()
+    {
+        isAttachedToPlayer = false;
+        playerTransform = null;
     }
 
     private void UpdateCooldowns()
     {
-        List<EnemyController> keys = new List<EnemyController>(hitCooldowns.Keys);
+        List<EnemyBase> keys = new List<EnemyBase>(hitCooldowns.Keys);
         foreach (var key in keys)
         {
             hitCooldowns[key] -= Time.deltaTime;
@@ -118,47 +142,44 @@ public class BouncingBall : MonoBehaviour
     {
         float radius = transform.localScale.x * 0.5f;
 
-        // 1. Check for arena wall collision (bounce)
         RaycastHit hit;
         if (Physics.SphereCast(transform.position, radius, moveDirection, out hit, moveDelta.magnitude + 0.15f))
         {
-            // If it's a wall or arena boundary
-            if (hit.collider.gameObject.name.Contains("Wall") || hit.collider.gameObject.name.Contains("Border"))
+            // 1. เช็คชนกำแพง
+            if (hit.collider.gameObject.name.Contains("Wall") || hit.collider.gameObject.name.Contains("Border") || hit.collider.CompareTag("Wall"))
             {
-                ReflectFromWall(hit.normal, hit.point);
+                ReflectFromSurface(hit.normal, hit.point);
+            }
+            // 2. เช็คชน Pinball / Bumper
+            else if (hit.collider.gameObject.name.Contains("Pinball") || hit.collider.gameObject.name.Contains("Bumper") || hit.collider.CompareTag("Pinball"))
+            {
+                currentSpeed = Mathf.Min(currentSpeed * 1.1f, boostedSpeed);
+                ReflectFromSurface(hit.normal, hit.point);
+
+                PinballBumper bumper = hit.collider.GetComponentInParent<PinballBumper>();
+                if (bumper != null) bumper.OnHitByBall();
+            }
+            // 🌟 3. เช็คชน EnemyBase ผ่าน Raycast
+            else
+            {
+                EnemyBase enemyHit = hit.collider.GetComponentInParent<EnemyBase>() ?? hit.collider.GetComponent<EnemyBase>();
+                if (enemyHit != null && !hitCooldowns.ContainsKey(enemyHit))
+                {
+                    HitEnemyAndBounce(enemyHit, hit.point);
+                }
             }
         }
 
-        // Clamp inside arena walls to prevent escaping bounds
+        // Clamp ขอบสนามกันหลุด
         Vector3 curPos = transform.position;
         float boundary = 14.2f;
         bool bouncedWall = false;
 
-        if (curPos.x > boundary)
-        {
-            curPos.x = boundary;
-            moveDirection.x = -Mathf.Abs(moveDirection.x);
-            bouncedWall = true;
-        }
-        else if (curPos.x < -boundary)
-        {
-            curPos.x = -boundary;
-            moveDirection.x = Mathf.Abs(moveDirection.x);
-            bouncedWall = true;
-        }
+        if (curPos.x > boundary) { curPos.x = boundary; moveDirection.x = -Mathf.Abs(moveDirection.x); bouncedWall = true; }
+        else if (curPos.x < -boundary) { curPos.x = -boundary; moveDirection.x = Mathf.Abs(moveDirection.x); bouncedWall = true; }
 
-        if (curPos.z > boundary)
-        {
-            curPos.z = boundary;
-            moveDirection.z = -Mathf.Abs(moveDirection.z);
-            bouncedWall = true;
-        }
-        else if (curPos.z < -boundary)
-        {
-            curPos.z = -boundary;
-            moveDirection.z = Mathf.Abs(moveDirection.z);
-            bouncedWall = true;
-        }
+        if (curPos.z > boundary) { curPos.z = boundary; moveDirection.z = -Mathf.Abs(moveDirection.z); bouncedWall = true; }
+        else if (curPos.z < -boundary) { curPos.z = -boundary; moveDirection.z = Mathf.Abs(moveDirection.z); bouncedWall = true; }
 
         if (bouncedWall)
         {
@@ -168,25 +189,53 @@ public class BouncingBall : MonoBehaviour
             PlayBounceEffect(transform.position);
         }
 
-        // 2. Check for Enemy collision -> PIERCE THROUGH (บอลทะลุ ไม่เด้งกลับ!)
-        Collider[] overlaps = Physics.OverlapSphere(transform.position, radius + 0.2f);
+        // 4. เช็คชนวัตถุรอบตัวผ่าน OverlapSphere
+        Collider[] overlaps = Physics.OverlapSphere(transform.position, radius + 0.1f);
         foreach (var col in overlaps)
         {
-            EnemyController enemy = col.GetComponentInParent<EnemyController>();
-            if (enemy != null)
+            if (col.gameObject.name.Contains("Pinball") || col.gameObject.name.Contains("Bumper") || col.CompareTag("Pinball"))
             {
-                PierceEnemy(enemy, col.ClosestPoint(transform.position));
+                Vector3 normal = (transform.position - col.transform.position).normalized;
+                normal.y = 0;
+                if (normal == Vector3.zero) normal = -moveDirection;
+                ReflectFromSurface(normal, col.ClosestPoint(transform.position));
+
+                PinballBumper bumper = col.GetComponentInParent<PinballBumper>();
+                if (bumper != null) bumper.OnHitByBall();
+
+                break;
+            }
+
+            // 🌟 เช็คชน EnemyBase ผ่าน OverlapSphere
+            EnemyBase enemy = col.GetComponentInParent<EnemyBase>() ?? col.GetComponent<EnemyBase>();
+            if (enemy != null && !hitCooldowns.ContainsKey(enemy))
+            {
+                HitEnemyAndBounce(enemy, col.ClosestPoint(transform.position));
+                break;
             }
         }
     }
 
-    private void ReflectFromWall(Vector3 normal, Vector3 hitPoint)
+    private void HitEnemyAndBounce(EnemyBase enemy, Vector3 contactPoint)
+    {
+        hitCooldowns[enemy] = 0.2f;
+
+        float damage = (currentSpeed > baseSpeed + 3f) ? boostedDamage : normalDamage;
+        enemy.TakeDamage(damage, contactPoint, moveDirection); // 🌟 สั่งลดเลือดและแสดงดาเมจบนตัวศัตรู
+
+        Vector3 normal = (transform.position - enemy.transform.position).normalized;
+        normal.y = 0;
+        if (normal == Vector3.zero) normal = -moveDirection;
+
+        ReflectFromSurface(normal, contactPoint);
+    }
+
+    private void ReflectFromSurface(Vector3 normal, Vector3 hitPoint)
     {
         normal.y = 0;
         if (normal == Vector3.zero) return;
         normal.Normalize();
 
-        // Accurate reflection vector
         moveDirection = Vector3.Reflect(moveDirection, normal);
         moveDirection.y = 0;
         moveDirection.Normalize();
@@ -196,12 +245,7 @@ public class BouncingBall : MonoBehaviour
 
     private void PlayBounceEffect(Vector3 hitPoint)
     {
-        if (SoundEffects.Instance != null)
-        {
-            SoundEffects.Instance.PlayBounce();
-        }
-
-        // Spark particles on wall bounce
+        if (SoundEffects.Instance != null) SoundEffects.Instance.PlayBounce();
         SpawnSpark(hitPoint);
 
         if (CameraController.Instance != null)
@@ -210,45 +254,17 @@ public class BouncingBall : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Pierces through enemy without bouncing! Inflicts damage and blood.
-    /// </summary>
-    private void PierceEnemy(EnemyController enemy, Vector3 contactPoint)
-    {
-        if (hitCooldowns.ContainsKey(enemy)) return; // Already damaged in this pass
-
-        // Record cooldown so the ball doesn't multi-hit every frame
-        hitCooldowns[enemy] = 0.35f;
-
-        float damage = (currentSpeed > baseSpeed + 3f) ? boostedDamage : normalDamage;
-        enemy.TakeDamage(damage, contactPoint, moveDirection);
-
-        // DO NOT CHANGE moveDirection -> The ball penetrates straight through!
-        // Noticeable visual feedback
-        if (CameraController.Instance != null)
-        {
-            CameraController.Instance.ShakeCamera(0.12f, 0.2f);
-        }
-    }
-
-    /// <summary>
-    /// Called when the player hits the ball with their bat/weapon.
-    /// </summary>
     public void HitByPlayer(Vector3 hitDirection, float customForce = 0f)
     {
+        ReleaseFromPlayer();
+
         hitDirection.y = 0;
         moveDirection = hitDirection.normalized;
 
         currentSpeed = (customForce > 0f) ? customForce : boostedSpeed;
-
         UpdateVisuals();
 
-        if (SoundEffects.Instance != null)
-        {
-            SoundEffects.Instance.PlayHitBall();
-        }
-
-        // Hit spark burst
+        if (SoundEffects.Instance != null) SoundEffects.Instance.PlayHitBall();
         SpawnSpark(transform.position);
 
         if (CameraController.Instance != null)
@@ -305,15 +321,6 @@ public class BouncingBall : MonoBehaviour
                 new GradientAlphaKey[] { new GradientAlphaKey(0.85f, 0.0f), new GradientAlphaKey(0.0f, 1.0f) }
             );
             trailRenderer.colorGradient = gradient;
-        }
-    }
-
-    private void OnTriggerEnter(Collider other)
-    {
-        EnemyController enemy = other.GetComponentInParent<EnemyController>();
-        if (enemy != null)
-        {
-            PierceEnemy(enemy, other.ClosestPoint(transform.position));
         }
     }
 }

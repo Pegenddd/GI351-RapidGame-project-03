@@ -77,8 +77,8 @@ public class GameManager : MonoBehaviour
         if (speedText != null && activeBall != null)
         {
             speedText.text = $"⚡ Ball Speed: {activeBall.currentSpeed:F1} m/s";
-            speedText.color = (activeBall.currentSpeed > activeBall.baseSpeed + 2f) 
-                ? new Color(1f, 0.6f, 0.1f) 
+            speedText.color = (activeBall.currentSpeed > activeBall.baseSpeed + 2f)
+                ? new Color(1f, 0.6f, 0.1f)
                 : new Color(0.3f, 0.9f, 1f);
         }
     }
@@ -146,7 +146,7 @@ public class GameManager : MonoBehaviour
         speedRect.anchoredPosition = new Vector2(-25, -20);
         speedRect.sizeDelta = new Vector2(300, 40);
 
-        // Bottom Left Controls Panel
+        // Bottom Left Controls Panel (ขยายขนาดให้พอดีกับคำสั่งใหม่)
         GameObject controlsPanel = new GameObject("ControlsPanel");
         controlsPanel.transform.SetParent(canvasObj.transform, false);
         Image controlsBg = controlsPanel.AddComponent<Image>();
@@ -156,18 +156,19 @@ public class GameManager : MonoBehaviour
         ctrlRect.anchorMax = new Vector2(0f, 0f);
         ctrlRect.pivot = new Vector2(0f, 0f);
         ctrlRect.anchoredPosition = new Vector2(20, 20);
-        ctrlRect.sizeDelta = new Vector2(400, 120);
+        ctrlRect.sizeDelta = new Vector2(420, 155);
 
         GameObject ctrlTextObj = new GameObject("ControlsText");
         ctrlTextObj.transform.SetParent(controlsPanel.transform, false);
         Text ctrlText = ctrlTextObj.AddComponent<Text>();
         ctrlText.font = scoreText.font;
-        ctrlText.fontSize = 16;
+        ctrlText.fontSize = 15;
         ctrlText.alignment = TextAnchor.MiddleLeft;
         ctrlText.color = new Color(0.9f, 0.95f, 1f);
-        ctrlText.text = "🎮 [W, A, S, D] / ลูกศร: เดิน (Move)\n" +
+        ctrlText.text = "🎮 [WASD] / ลูกศร: เดิน (Move)\n" +
                         "🏏 [คลิกซ้าย / Space]: หวดลูกบอล (Hit Ball)\n" +
-                        "🩸 [บอลทะลุศัตรู]: บอลทะลุไม่หยุด ศัตรูเสียเลือด!\n" +
+                        "💨 [Shift ซ้าย / คลิกขวา]: แดชพุ่งหลบ (Dash)\n" +
+                        "🧲 [กด E ค้าง]: สกิลดูดบอล + โหมดเล็งช้า\n" +
                         "🔄 [R]: รีสตาร์ทเกม (Restart)";
         RectTransform ctrlTextRect = ctrlTextObj.GetComponent<RectTransform>();
         ctrlTextRect.anchorMin = Vector2.zero;
