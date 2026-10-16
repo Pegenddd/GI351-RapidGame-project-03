@@ -15,7 +15,7 @@ GameObject:
   - component: {fileID: 60849146190346429}
   m_Layer: 0
   m_Name: Enemy_01
-  m_TagString: Untagged
+  m_TagString: Enemy
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -133,4 +133,6 @@ MonoBehaviour:
   attackRange: 1.8
   attackPauseDuration: 1
   attackDamage: 10
+  flashColor: {r: 1, g: 1, b: 1, a: 1}
+  flashDuration: 0.1
   showHealthBar: 1

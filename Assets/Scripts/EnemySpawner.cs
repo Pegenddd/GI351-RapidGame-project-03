@@ -1,104 +1,90 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// Spawns enemies periodically across the arena.
-/// </summary>
 public class EnemySpawner : MonoBehaviour
 {
-    [Header("Spawn Settings")]
-    public int maxEnemies = 8;
-    public float spawnInterval = 2.5f;
-    public float arenaHalfSize = 12f;
-    public float minDistanceFromPlayer = 5f;
-
-    private float timer = 0f;
-    private Transform playerTransform;
-
-    private void Start()
+    [System.Serializable]
+    public class EnemySpawnData
     {
-        PlayerController pc = FindFirstObjectByType<PlayerController>();
-        if (pc != null)
-        {
-            playerTransform = pc.transform;
-        }
-
-        // Initial batch of enemies
-        for (int i = 0; i < 4; i++)
-        {
-            SpawnEnemy();
-        }
+        [Tooltip("Prefab ของศัตรูชนิดนี้")]
+        public GameObject enemyPrefab;
+        [Tooltip("น้ำหนักโอกาสสุ่มเกิด")]
+        public float spawnWeight = 1f;
     }
+
+    [Header("Enemy Pool")]
+    public List<EnemySpawnData> enemyPrefabs = new List<EnemySpawnData>();
+
+    [Header("Spawn Points")]
+    public List<Transform> spawnPoints = new List<Transform>();
+
+    [Header("Balance & Scaling Settings")]
+    [Tooltip("จำนวนศัตรูสูงสุดที่อนุญาตให้มีในฉากพร้อมกัน")]
+    public int maxEnemiesInScene = 25;
+
+    [Tooltip("อัตราการเกิดเริ่มต้น (กี่วินาทีต่อ 1 ตัว)")]
+    public float baseSpawnInterval = 1.5f;
+
+    [Tooltip("ความยากเพิ่มขึ้นตามเวลา (ยิ่งค่ามาก ยิ่งเกิดเร็วขึ้นเรื่อยๆ ทุกๆ นาที)")]
+    public float difficultyMultiplierPerMinute = 0.15f;
+
+    private float gameTimer = 0f;
+    private float spawnTimer = 0f;
 
     private void Update()
     {
-        timer += Time.deltaTime;
-        if (timer >= spawnInterval)
+        if (enemyPrefabs.Count == 0 || spawnPoints.Count == 0) return;
+
+        // จับเวลาเกมเดินหน้า
+        gameTimer += Time.deltaTime;
+        spawnTimer += Time.deltaTime;
+
+        // คำนวณช่วงเวลาเกิดที่จะสั้นลงเรื่อยๆ ตามเวลาที่ผ่านไป (เกมยิ่งเล่นยิ่งเดือด)
+        float currentInterval = Mathf.Max(0.2f, baseSpawnInterval - (gameTimer / 60f) * difficultyMultiplierPerMinute);
+
+        if (spawnTimer >= currentInterval)
         {
-            timer = 0f;
+            spawnTimer = 0f;
+
+            // เช็กจำนวนมอนสเตอร์ปัจจุบันในฉาก
             int currentEnemyCount = FindObjectsByType<EnemyController>(FindObjectsInactive.Exclude, FindObjectsSortMode.None).Length;
-            if (currentEnemyCount < maxEnemies)
+
+            if (currentEnemyCount < maxEnemiesInScene)
             {
-                SpawnEnemy();
+                SpawnBalancedEnemy();
             }
         }
     }
 
-    public GameObject SpawnEnemy()
+    private void SpawnBalancedEnemy()
     {
-        Vector3 spawnPos = GetRandomSpawnPosition();
+        // 1. สุ่มเลือกจุดเกิด
+        Transform sp = spawnPoints[Random.Range(0, spawnPoints.Count)];
+        if (sp == null) return;
 
-        // Create Enemy GameObject
-        GameObject enemyObj = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-        enemyObj.name = "Enemy";
-        enemyObj.transform.position = spawnPos;
-        enemyObj.transform.localScale = new Vector3(1f, 1.2f, 1f);
+        // 2. สุ่มเลือกชนิดศัตรูตาม Weight
+        EnemySpawnData selectedData = GetWeightedRandomEnemyData();
+        if (selectedData == null || selectedData.enemyPrefab == null) return;
 
-        // Setup material
-        Renderer rend = enemyObj.GetComponent<Renderer>();
-        if (rend != null)
-        {
-            rend.material = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
-            rend.material.color = new Color(0.9f, 0.25f, 0.25f);
-        }
-
-        // Add Enemy Controller
-        EnemyController ec = enemyObj.AddComponent<EnemyController>();
-
-        // Enemy eye indicator to show facing direction
-        GameObject visor = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        visor.name = "Visor";
-        visor.transform.SetParent(enemyObj.transform, false);
-        visor.transform.localPosition = new Vector3(0, 0.4f, 0.45f);
-        visor.transform.localScale = new Vector3(0.6f, 0.25f, 0.3f);
-        Destroy(visor.GetComponent<Collider>());
-        Renderer visorRend = visor.GetComponent<Renderer>();
-        if (visorRend != null)
-        {
-            visorRend.material = new Material(Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Standard"));
-            visorRend.material.color = Color.black;
-        }
-
-        return enemyObj;
+        // 3. สร้างศัตรู
+        Instantiate(selectedData.enemyPrefab, sp.position, sp.rotation);
     }
 
-    private Vector3 GetRandomSpawnPosition()
+    private EnemySpawnData GetWeightedRandomEnemyData()
     {
-        for (int attempts = 0; attempts < 15; attempts++)
-        {
-            float x = Random.Range(-arenaHalfSize, arenaHalfSize);
-            float z = Random.Range(-arenaHalfSize, arenaHalfSize);
-            Vector3 pos = new Vector3(x, 1f, z);
+        float totalWeight = 0f;
+        foreach (var data in enemyPrefabs) { totalWeight += data.spawnWeight; }
 
-            if (playerTransform != null)
-            {
-                if (Vector3.Distance(pos, playerTransform.position) < minDistanceFromPlayer)
-                {
-                    continue; // Too close to player, try again
-                }
-            }
-            return pos;
+        if (totalWeight <= 0f) return null;
+
+        float rnd = Random.Range(0f, totalWeight);
+        float currentSum = 0f;
+
+        foreach (var data in enemyPrefabs)
+        {
+            currentSum += data.spawnWeight;
+            if (rnd <= currentSum) return data;
         }
-        return new Vector3(Random.Range(-8f, 8f), 1f, Random.Range(-8f, 8f));
+        return enemyPrefabs[0];
     }
 }

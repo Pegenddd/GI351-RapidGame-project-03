@@ -2074,6 +2074,7 @@ MonoBehaviour:
   boostedDamage: 60
   normalColor: {r: 0.2, g: 0.8, b: 1, a: 1}
   boostedColor: {r: 1, g: 0.5, b: 0.1, a: 1}
+  explosiveColor: {r: 1, g: 0.1, b: 0.1, a: 1}
 --- !u!23 &2078252587
 MeshRenderer:
   m_ObjectHideFlags: 0

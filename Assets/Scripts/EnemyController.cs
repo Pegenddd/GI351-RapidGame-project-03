@@ -27,6 +27,11 @@ public class EnemyController : MonoBehaviour
     private float wanderTimer = 0f;
     private bool isDead = false;
 
+    // ตัวแปรสำหรับระบบสโลว์จาก Icewall
+    private float originalMoveSpeed = -1f;
+    private float slowTimer = 0f;
+    private bool isSlowed = false;
+
     // Overhead Health UI
     [Header("UI Settings")]
     [Tooltip("แสดงหลอดเลือดบนหัวศัตรู")]
@@ -69,6 +74,9 @@ public class EnemyController : MonoBehaviour
     private void Update()
     {
         if (isDead) return;
+
+        // 🌟 เรียกใช้งานระบบจับเวลาสโลว์ในทุกๆ เฟรม
+        HandleSlowTimer();
 
         UpdateMovement();
         UpdateHealthBarTransform();
@@ -336,6 +344,33 @@ public class EnemyController : MonoBehaviour
         {
             // Face the overhead health bar towards the camera
             healthCanvasObj.transform.rotation = Camera.main.transform.rotation;
+        }
+    }
+
+    // ฟังก์ชันรับค่าสโลว์จาก Icewall
+    public void ApplySlowEffect(float slowFactor, float duration)
+    {
+        if (!isSlowed)
+        {
+            originalMoveSpeed = moveSpeed; // บันทึกความเร็วเดิมไว้
+            moveSpeed *= slowFactor;        // สั่งชะลอความเร็ว
+        }
+
+        slowTimer = duration;
+        isSlowed = true;
+    }
+
+    // ฟังก์ชันจับเวลาถอยหลังเพื่อคืนค่าความเร็วเดิมของศัตรู
+    private void HandleSlowTimer()
+    {
+        if (isSlowed)
+        {
+            slowTimer -= Time.deltaTime;
+            if (slowTimer <= 0f)
+            {
+                moveSpeed = originalMoveSpeed; // หมดเวลาสโลว์ คืนค่าความเร็วเดิม
+                isSlowed = false;
+            }
         }
     }
 }

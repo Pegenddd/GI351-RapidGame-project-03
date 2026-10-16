@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -13,21 +14,29 @@ public class EnemyBase : MonoBehaviour
 
     [Header("Movement & Combat Settings")]
     public float moveSpeed = 4f;                 // ความเร็วในการวิ่งไล่ตามผู้เล่น
-    public float attackRange = 1.8f;             // ระยะประชิดที่ศัตรูจะเริ่มโจมตี
-    public float attackPauseDuration = 0.8f;     // ระยะเวลาที่หยุดยืนรอก่อนไล่ต่อหลังโจมตี
-    public float attackDamage = 10f;             // ดาเมจที่ทำใส่ผู้เล่น
+    public float attackRange = 1.8f;              // ระยะประชิดที่ศัตรูจะเริ่มโจมตี
+    public float attackPauseDuration = 0.8f;      // ระยะเวลาที่หยุดยืนรอก่อนไล่ต่อหลังโจมตี
+    public float attackDamage = 10f;              // ดาเมจที่ทำใส่ผู้เล่น
 
     private bool isAttackingPause = false;
     private float pauseTimer = 0f;
 
     [Header("Visual Feedback (Flash)")]
-    public Color flashColor = Color.white;       // สีตอนโดนตี (สีกระพริบ)
-    public float flashDuration = 0.1f;           // ระยะเวลาที่กระพริบ
+    public Color flashColor = Color.white;        // สีตอนโดนตี (สีกระพริบ)
+    public float flashDuration = 0.1f;            // ระยะเวลาที่กระพริบ
 
     private Renderer meshRenderer;
     private MaterialPropertyBlock propBlock;
     private Transform playerTransform;
     private bool isDead = false;
+
+    // ตัวแปรสำหรับเก็บค่าสโลว์ของศัตรู
+    private float originalMoveSpeed = -1f;
+    private float slowTimer = 0f;
+    private bool isSlowed = false;
+
+    // ตัวแปรเช็กสถานะกำลังโดนแรงดึงดูดของเสาพินบอล
+    private bool isBeingPulled = false;
 
     // Overhead Health UI
     [Header("UI Settings")]
@@ -63,12 +72,18 @@ public class EnemyBase : MonoBehaviour
     {
         if (isDead) return;
 
+        // เรียกใช้งานระบบจับเวลาสโลว์ในทุกๆ เฟรม
+        HandleSlowTimer();
+
         UpdateMovementAndCombat();
         UpdateHealthBarTransform();
     }
 
     private void UpdateMovementAndCombat()
     {
+        // ถ้ากำลังโดนแรงดึงดูดของเสาอยู่ จะไม่ให้ AI วิ่งเดินเองตามปกติเพื่อไม่ให้ขัดแย้งกัน
+        if (isBeingPulled) return;
+
         if (playerTransform == null) return;
 
         // ถ้าอยู่ในสถานะหยุดจังหวะหลังโจมตี
@@ -91,7 +106,13 @@ public class EnemyBase : MonoBehaviour
         if (distToPlayer > attackRange)
         {
             Vector3 moveDir = toPlayer.normalized;
-            transform.position += moveDir * moveSpeed * Time.deltaTime;
+
+            // เช็กสิ่งกีดขวางด้านหน้าก่อนขยับตัว (ป้องกันการเดินทะลุวัตถุพิเศษ)
+            float raycastDist = moveSpeed * Time.deltaTime + 0.3f;
+            if (!Physics.Raycast(transform.position + Vector3.up * 0.5f, moveDir, raycastDist))
+            {
+                transform.position += moveDir * moveSpeed * Time.deltaTime;
+            }
 
             // หันหน้าเข้าหาผู้เล่น
             Quaternion targetRot = Quaternion.LookRotation(moveDir, Vector3.up);
@@ -345,5 +366,38 @@ public class EnemyBase : MonoBehaviour
         {
             healthCanvasObj.transform.rotation = Camera.main.transform.rotation;
         }
+    }
+
+    // ฟังก์ชันรับค่าสโลว์จาก BouncingBall เมื่อลูกบอลน้ำแข็งพุ่งชน
+    public void ApplySlowEffect(float slowFactor, float duration)
+    {
+        if (!isSlowed)
+        {
+            originalMoveSpeed = moveSpeed; // บันทึกความเร็วเดิมไว้
+            moveSpeed *= slowFactor;        // สั่งชะลอความเร็ว
+        }
+
+        slowTimer = duration;
+        isSlowed = true;
+    }
+
+    // ฟังก์ชันจับเวลาถอยหลังเพื่อคืนค่าความเร็วเดิมของศัตรู
+    private void HandleSlowTimer()
+    {
+        if (isSlowed)
+        {
+            slowTimer -= Time.deltaTime;
+            if (slowTimer <= 0f)
+            {
+                moveSpeed = originalMoveSpeed; // หมดเวลาสโลว์ คืนค่าความเร็วเดิม
+                isSlowed = false;
+            }
+        }
+    }
+
+    // ฟังก์ชันสำหรับเปิด-ปิดสถานะถูกแรงดึงดูดของเสาพินบอลครอบงำ
+    public void SetPulledState(bool pulled)
+    {
+        isBeingPulled = pulled;
     }
 }

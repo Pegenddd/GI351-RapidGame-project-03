@@ -237,8 +237,31 @@ public class PlayerController : MonoBehaviour
         dashTimer += Time.deltaTime;
         if (dashTimer < dashDuration)
         {
-            transform.position += dashDir * (dashSpeed * Time.deltaTime);
-            ClampPosition();
+            float dashDistance = dashSpeed * Time.deltaTime;
+            float playerRadius = 0.4f;
+            Vector3 origin = transform.position + Vector3.up * 0.5f;
+            bool isBlocked = false;
+
+            // 🌟 เช็กการชนระหว่างแดช เพื่อไม่ให้พุ่งทะลุพินบอลหรือสิ่งกีดขวาง
+            if (Physics.SphereCast(origin, playerRadius, dashDir, out RaycastHit hit, dashDistance + 0.1f))
+            {
+                if (hit.collider.transform != transform &&
+                    (targetMagnetBall == null || hit.collider.transform != targetMagnetBall.transform))
+                {
+                    isBlocked = true;
+                }
+            }
+
+            if (!isBlocked)
+            {
+                transform.position += dashDir * dashDistance;
+                ClampPosition();
+            }
+            else
+            {
+                // ถ้าพุ่งไปชนสิ่งกีดขวาง ให้หยุดแดชทันที
+                isDashing = false;
+            }
         }
         else
         {
