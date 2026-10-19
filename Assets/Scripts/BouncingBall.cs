@@ -17,7 +17,7 @@ public class BouncingBall : MonoBehaviour
     public Color normalColor = new Color(0.2f, 0.8f, 1f);
     public Color boostedColor = new Color(1f, 0.5f, 0.1f);
     public Color explosiveColor = new Color(1f, 0.1f, 0.1f);
-    public Color iceColor = new Color(0.4f, 0.8f, 1f); // สีฟ้าครามเมื่อบอลติดสถานะน้ำแข็ง
+    public Color iceColor = new Color(0.4f, 0.8f, 1f);
 
     private Vector3 moveDirection;
     private TrailRenderer trailRenderer;
@@ -28,19 +28,19 @@ public class BouncingBall : MonoBehaviour
     private bool isAttachedToPlayer = false;
     private Transform playerTransform;
 
-    private bool isExplosive = false;
+    // 🌟 เปลี่ยนตัวแปรสถานะให้เป็น public เพื่อให้ GameManager ดึงไปแสดงบน UI ได้
+    public bool isExplosive = false;
     private float explosionRadius = 5f;
     private float explosionDamage = 80f;
-    private bool explodeOnlyOnEnemy = false; // ตัวแปรเก็บค่าเงื่อนไขการระเบิด
+    private bool explodeOnlyOnEnemy = false; 
 
-    // ตัวแปรสำหรับสถานะกระสุนน้ำแข็ง (Ice Effect)
-    private bool hasIceEffect = false;
+    public bool hasIceEffect = false;
     private float storedSlowFactor = 0.4f;
     private float storedSlowDuration = 2.0f;
 
-    // Orbit State variables
-    private bool isOrbiting = false;
-    private Transform orbitTargetTransform;
+    public bool isOrbiting = false;
+    public Transform orbitTargetTransform;
+    
     private float orbitAngle = 0f;
     private float orbitRadius = 2.5f;
     private float currentOrbitSpeed = 150f;
@@ -197,6 +197,8 @@ public class BouncingBall : MonoBehaviour
         Vector3 dir = transform.position - centerTarget.position;
         orbitAngle = Mathf.Atan2(dir.z, dir.x) * Mathf.Rad2Deg;
         orbitRadius = Mathf.Max(1.5f, dir.magnitude);
+        
+        UpdateVisuals(); // 🌟 อัปเดตเพื่อให้ UI รู้ทันที
     }
 
     private void ExitOrbitState()
@@ -218,23 +220,19 @@ public class BouncingBall : MonoBehaviour
         UpdateVisuals();
     }
 
-    // ฟังก์ชันสำหรับรับค่าความหนืดเมื่อชน Icewall
     public void ApplySlowDown(float slowFactor)
     {
-        currentSpeed *= slowFactor; // ลดความเร็วลงตามตัวคูณที่กำหนด
-        currentSpeed = Mathf.Max(currentSpeed, 3f); // ล็อกความเร็วขั้นต่ำไม่ให้บอลหยุดนิ่งสนิท
+        currentSpeed *= slowFactor; 
+        currentSpeed = Mathf.Max(currentSpeed, 3f); 
         UpdateVisuals();
     }
 
-    // ฟังก์ชันรับสถานะน้ำแข็งจาก Icewall และเก็บบัฟไว้ส่งต่อให้ศัตรู
     public void ApplyIceEffect(float slowFactor, float duration)
     {
         ApplySlowDown(slowFactor);
-
         hasIceEffect = true;
         storedSlowFactor = slowFactor;
         storedSlowDuration = duration;
-
         UpdateVisuals();
     }
 
@@ -249,11 +247,20 @@ public class BouncingBall : MonoBehaviour
             if (enemy != null)
             {
                 enemy.TakeDamage(explosionDamage, enemy.transform.position, (enemy.transform.position - hitPoint).normalized);
+                
+                // 🌟 [ระบบคอมโบ]: หากมีสถานะน้ำแข็งซ้อนทับอยู่ด้วย ระเบิดจะทำการแช่แข็งศัตรูทั้งกลุ่มพร้อมกัน!
+                if (hasIceEffect)
+                {
+                    enemy.ApplySlowEffect(storedSlowFactor, storedSlowDuration);
+                }
             }
         }
 
+        // ล้างสถานะทั้งหมดทิ้งเมื่อใช้งานเสร็จ
         isExplosive = false;
         explodeOnlyOnEnemy = false;
+        hasIceEffect = false; 
+        
         UpdateVisuals();
     }
 
@@ -270,6 +277,7 @@ public class BouncingBall : MonoBehaviour
                 clonedBall.moveDirection = rot * Vector3.forward;
                 clonedBall.currentSpeed = baseSpeed;
                 clonedBall.isExplosive = false;
+                clonedBall.hasIceEffect = false; // ของโคลนเริ่มใหม่ไม่มีบัฟ
                 clonedBall.explodeOnlyOnEnemy = false;
 
                 Destroy(clone, duration);
@@ -306,7 +314,6 @@ public class BouncingBall : MonoBehaviour
                 return;
             }
 
-            // เช็กการชนกับ Icewall
             Icewall iceWall = hit.collider.GetComponentInParent<Icewall>() ?? hit.collider.GetComponent<Icewall>();
             if (iceWall != null)
             {
@@ -374,7 +381,6 @@ public class BouncingBall : MonoBehaviour
                 break;
             }
 
-            // เช็ก Overlap กับ Icewall
             Icewall iceOverlap = col.GetComponentInParent<Icewall>() ?? col.GetComponent<Icewall>();
             if (iceOverlap != null)
             {
@@ -395,7 +401,6 @@ public class BouncingBall : MonoBehaviour
 
                 PinballBumper bumper = col.GetComponentInParent<PinballBumper>();
                 if (bumper != null) bumper.OnHitByBall();
-
                 break;
             }
 
@@ -415,17 +420,17 @@ public class BouncingBall : MonoBehaviour
         float damage = (currentSpeed > baseSpeed + 3f) ? boostedDamage : normalDamage;
         enemy.TakeDamage(damage, contactPoint, moveDirection);
 
-        // ถ้าบอลมีสถานะน้ำแข็ง ให้ส่งต่อไปยังศัตรู
-        if (hasIceEffect)
-        {
-            enemy.ApplySlowEffect(storedSlowFactor, storedSlowDuration);
-            hasIceEffect = false; // ส่งต่อแล้ว ล้างสถานะน้ำแข็งออก
-            UpdateVisuals();
-        }
-
         if (isExplosive)
         {
+            // ถ้าระเบิด มันจะทำความเสียหายหมู่ + ถ่ายทอดสถานะน้ำแข็งหมู่(ถ้ามี) ในฟังก์ชัน TriggerExplosion ทันที
             TriggerExplosion(contactPoint);
+        }
+        else if (hasIceEffect)
+        {
+            // ถ้ามีแค่น้ำแข็งธรรมดา ก็จะส่งสถานะสโลว์ให้เป้าหมายที่โดนตรงๆ
+            enemy.ApplySlowEffect(storedSlowFactor, storedSlowDuration);
+            hasIceEffect = false;
+            UpdateVisuals();
         }
 
         Vector3 normal = (transform.position - enemy.transform.position).normalized;
@@ -532,7 +537,12 @@ public class BouncingBall : MonoBehaviour
 
         ParticleSystem ps = expObj.AddComponent<ParticleSystem>();
         var main = ps.main;
-        main.startColor = new ParticleSystem.MinMaxGradient(Color.red, Color.yellow);
+        
+        // 🌟 ถ้าระเบิดติดน้ำแข็งด้วย ให้ใช้ไฟระเบิดสีฟ้า
+        Color expStartColor = hasIceEffect ? new Color(0.2f, 0.8f, 1f) : Color.red;
+        Color expEndColor = hasIceEffect ? Color.white : Color.yellow;
+        
+        main.startColor = new ParticleSystem.MinMaxGradient(expStartColor, expEndColor);
         main.startSize = new ParticleSystem.MinMaxCurve(0.5f, 1.2f);
         main.startSpeed = new ParticleSystem.MinMaxCurve(6f, 12f);
         main.startLifetime = new ParticleSystem.MinMaxCurve(0.3f, 0.5f);
@@ -551,9 +561,13 @@ public class BouncingBall : MonoBehaviour
     {
         Color activeColor = normalColor;
 
-        if (hasIceEffect)
+        if (hasIceEffect && isExplosive)
         {
-            activeColor = iceColor; // แสดงสีฟ้าครามเมื่อติดสถานะน้ำแข็ง
+            activeColor = new Color(0.8f, 0.2f, 0.9f); // 🌟 สีม่วงอมชมพู เมื่อติด 2 สถานะ
+        }
+        else if (hasIceEffect)
+        {
+            activeColor = iceColor; 
         }
         else if (isExplosive)
         {

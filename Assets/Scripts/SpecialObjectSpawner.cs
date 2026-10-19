@@ -1,30 +1,44 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 public class SpecialObjectSpawner : MonoBehaviour
 {
-    [Header("Prefabs ทั้ง 3 ชนิด")]
-    public GameObject[] objectPrefabs; // 0: Orbit, 1: Explode, 2: Split
+    [System.Serializable]
+    public class SpecialObjectConfig
+    {
+        [Tooltip("Prefab ของเสาพินบอลพิเศษ")]
+        public GameObject prefab;
+        
+        [Tooltip("ดีเลย์ก่อนเริ่มเกิดชิ้นแรกของชนิดนี้ หลังจากมันพัง (วินาที)")]
+        public float respawnDelay = 5.0f;
+        
+        [Tooltip("ระยะห่าง (วินาที) หากชนิดนี้พังพร้อมกันหลายชิ้น ชิ้นต่อไปจะรอเพิ่มกี่วินาที")]
+        public float spawnInterval = 1.0f;
+    }
+
+    [Header("Prefabs & Timings (ตั้งเวลาแยกตามชนิดได้)")]
+    public List<SpecialObjectConfig> specialObjects = new List<SpecialObjectConfig>();
 
     [Header("Spawn Configuration")]
-    public int totalSpawnCount = 5;          // จำนวนรวมที่ต้องการให้คงอยู่ในแมพตลอดเวลา
-    public int maxPerType = 2;               // ห้ามมี Object ชนิดเดียวกันเกินกี่อัน
-    public float checkInterval = 2.0f;       // เช็ครักษาจำนวนทุกๆ กี่วินาที
+    [Tooltip("จำนวนสูงสุดที่อนุญาตให้มีในฉาก 'ต่อ 1 ชนิด'")]
+    public int maxPerType = 1;               
+    public float checkInterval = 2.0f;       
 
     [Header("Spawn Points")]
-    [Tooltip("ลาก GameObjects ที่ใช้เป็นจุดเกิด (Spawn Points) มาใส่ในนี้")]
     public List<Transform> spawnPoints = new List<Transform>();
 
     [Header("Safety Checks")]
-    public float minDistanceFromPlayer = 3.5f; // ห้ามเกิดใกล้ผู้เล่นเกินระยะนี้
-    public float minDistanceFromEnemy = 2.5f;  // ห้ามเกิดทับหรือใกล้ศัตรูเกินระยะนี้
-    public float minDistanceFromOtherPinball = 2.0f; // ห้ามเกิดใกล้พินบอลด้วยกันเองเกินระยะนี้
+    public float minDistanceFromPlayer = 3.5f; 
+    public float minDistanceFromEnemy = 2.5f;  
+    public float minDistanceFromOtherPinball = 2.0f; 
 
     private float timer = 0f;
+    private Dictionary<SpecialPinballObject.ObjectType, int> queuePerType = new Dictionary<SpecialPinballObject.ObjectType, int>();
 
     private void Start()
     {
-        SpawnMissingObjects();
+        CheckAndQueueSpawns(true);
     }
 
     private void Update()
@@ -33,100 +47,85 @@ public class SpecialObjectSpawner : MonoBehaviour
         if (timer >= checkInterval)
         {
             timer = 0f;
-            SpawnMissingObjects();
+            CheckAndQueueSpawns(false);
         }
     }
 
-    public void SpawnMissingObjects()
+    public void CheckAndQueueSpawns(bool immediate)
     {
-        if (objectPrefabs == null || objectPrefabs.Length == 0) return;
+        if (specialObjects == null || specialObjects.Count == 0) return;
         if (spawnPoints == null || spawnPoints.Count == 0) return;
 
         SpecialPinballObject[] existingObjects = FindObjectsByType<SpecialPinballObject>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        int currentTotal = existingObjects.Length;
-
-        if (currentTotal >= totalSpawnCount) return;
-
-        // 🌟 1. นับจำนวนแยกตามชนิด (Type) จาก objectType โดยตรงให้ชัวร์
-        Dictionary<SpecialPinballObject.ObjectType, int> typeCounts = new Dictionary<SpecialPinballObject.ObjectType, int>();
-
-        // กำหนดค่าเริ่มต้นให้ครบทุก Type เป็น 0
-        foreach (SpecialPinballObject.ObjectType typeVal in System.Enum.GetValues(typeof(SpecialPinballObject.ObjectType)))
-        {
-            typeCounts[typeVal] = 0;
-        }
-
-        // นับจำนวนที่มีอยู่จริงในฉากตอนนี้
+        
+        Dictionary<SpecialPinballObject.ObjectType, int> activeCounts = new Dictionary<SpecialPinballObject.ObjectType, int>();
         foreach (var obj in existingObjects)
         {
             if (obj != null)
             {
-                if (typeCounts.ContainsKey(obj.objectType))
-                {
-                    typeCounts[obj.objectType]++;
-                }
+                if (!activeCounts.ContainsKey(obj.objectType)) activeCounts[obj.objectType] = 0;
+                activeCounts[obj.objectType]++;
             }
         }
 
-        int neededCount = totalSpawnCount - currentTotal;
-
-        while (neededCount > 0)
+        // 🌟 วนลูปเช็กแต่ละชนิดว่าขาดไปกี่ชิ้นจากโควตา Max Per Type
+        foreach (var config in specialObjects)
         {
-            // 2. ค้นหาเฉพาะจุดเกิดที่ว่างและปลอดภัย
-            List<Transform> validSpawnPoints = new List<Transform>();
-            foreach (var sp in spawnPoints)
+            if (config.prefab != null)
             {
-                if (sp != null && IsPositionSafe(sp.position))
+                var script = config.prefab.GetComponent<SpecialPinballObject>();
+                if (script != null)
                 {
-                    validSpawnPoints.Add(sp);
-                }
-            }
+                    var type = script.objectType;
+                    int totalOfType = (activeCounts.ContainsKey(type) ? activeCounts[type] : 0) + 
+                                      (queuePerType.ContainsKey(type) ? queuePerType[type] : 0);
+                    
+                    int neededOfThisType = maxPerType - totalOfType;
 
-            if (validSpawnPoints.Count == 0) break;
-
-            // 🌟 3. กรองเอาเฉพาะ "ชนิดของพินบอล" ที่ยังมีจำนวนไม่เกิน maxPerType จริงๆ เท่านั้น
-            List<int> availableTypeIndices = new List<int>();
-            for (int i = 0; i < objectPrefabs.Length; i++)
-            {
-                if (objectPrefabs[i] != null)
-                {
-                    // ดึง Component จาก Prefab มาเช็ก Enum Type ของมันตรงๆ เลย
-                    SpecialPinballObject pinballScript = objectPrefabs[i].GetComponent<SpecialPinballObject>();
-                    if (pinballScript != null)
+                    // สั่งคิวเกิดใหม่ตามจำนวนที่ขาด
+                    for (int i = 0; i < neededOfThisType; i++)
                     {
-                        SpecialPinballObject.ObjectType prefabType = pinballScript.objectType;
+                        if (!queuePerType.ContainsKey(type)) queuePerType[type] = 0;
+                        
+                        int queuePosition = queuePerType[type];
+                        queuePerType[type]++;
 
-                        // ถ้าชนิดนี้ยังมีจำนวนในฉากไม่ถึง maxPerType อนุญาตให้สุ่มเกิดได้
-                        if (typeCounts.ContainsKey(prefabType) && typeCounts[prefabType] < maxPerType)
-                        {
-                            availableTypeIndices.Add(i);
-                        }
+                        float delay = immediate ? 0f : (config.respawnDelay + (queuePosition * config.spawnInterval));
+                        StartCoroutine(SpawnSpecificObjectAfterDelay(delay, config.prefab, type));
                     }
                 }
             }
+        }
+    }
 
-            // ถ้าทุกชนิดเกินโควตา maxPerType หมดแล้ว ให้หยุดทันที
-            if (availableTypeIndices.Count == 0) break;
+    private IEnumerator SpawnSpecificObjectAfterDelay(float delay, GameObject prefab, SpecialPinballObject.ObjectType type)
+    {
+        if (delay > 0f)
+        {
+            yield return new WaitForSeconds(delay);
+        }
 
-            // สุ่มเลือก Index จากกลุ่มชนิดที่ยังไม่เต็มโควตาเท่านั้น
-            int chosenPrefabIndex = availableTypeIndices[Random.Range(0, availableTypeIndices.Count)];
+        List<Transform> validSpawnPoints = new List<Transform>();
+        foreach (var sp in spawnPoints)
+        {
+            if (sp != null && IsPositionSafe(sp.position))
+            {
+                validSpawnPoints.Add(sp);
+            }
+        }
 
-            // สุ่มเลือกจุดเกิดที่ปลอดภัย
+        if (validSpawnPoints.Count > 0)
+        {
             Transform selectedSpawnPoint = validSpawnPoints[Random.Range(0, validSpawnPoints.Count)];
             Vector3 spawnPos = selectedSpawnPoint.position;
             spawnPos.y = 0.6f;
+            Instantiate(prefab, spawnPos, Quaternion.identity);
+        }
 
-            // สร้างพินบอล
-            GameObject spawnedObj = Instantiate(objectPrefabs[chosenPrefabIndex], spawnPos, Quaternion.identity);
-
-            // อัปเดตจำนวนนับในดิกชันนารีทันที เพื่อไม่ให้ลูปถัดไปสุ่มเกินอีก
-            SpecialPinballObject spawnedScript = spawnedObj.GetComponent<SpecialPinballObject>();
-            if (spawnedScript != null && typeCounts.ContainsKey(spawnedScript.objectType))
-            {
-                typeCounts[spawnedScript.objectType]++;
-            }
-
-            neededCount--;
+        if (queuePerType.ContainsKey(type))
+        {
+            queuePerType[type]--;
+            if (queuePerType[type] < 0) queuePerType[type] = 0;
         }
     }
 

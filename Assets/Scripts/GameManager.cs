@@ -8,11 +8,6 @@ using UnityEngine.InputSystem;
 using UnityEditor;
 #endif
 
-/// <summary>
-/// GameManager manages score, defeated enemy counter, player survival time,
-/// HUD UI, and the Death / Game Over system with Main Menu navigation.
-/// All UI elements can be directly modified and assigned via the Unity Hierarchy and Inspector.
-/// </summary>
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
@@ -28,7 +23,6 @@ public class GameManager : MonoBehaviour
     [Tooltip("ลากไฟล์ Scene (.unity) ที่ต้องการให้เป็นเมนูหลักมาวางใส่ที่นี่ได้โดยตรง")]
     public SceneAsset targetMainMenuSceneAsset;
 #endif
-    [Tooltip("ชื่อ Scene เมนูหลัก")]
     public string mainMenuSceneName = "MainMenu";
 
 #if UNITY_EDITOR
@@ -41,10 +35,11 @@ public class GameManager : MonoBehaviour
     }
 #endif
 
-    [Header("UI References in Hierarchy (แก้ไขได้โดยตรงใน Hierarchy)")]
+    [Header("UI References in Hierarchy")]
     public Canvas hudCanvas;
     public Text scoreText;
     public Text speedText;
+    public Text statusText; // 🌟 เพิ่ม Text UI สำหรับบอกสถานะ
     public GameObject controlsPanel;
     public GameObject gameOverPanel;
     public Text gameOverStatsText;
@@ -71,16 +66,12 @@ public class GameManager : MonoBehaviour
     {
         activeBall = FindAnyObjectByType<BouncingBall>();
 
-        // ถ้าใน Hierarchy ยังไม่มี HUDCanvas เลย ถึงจะสร้าง fallback
         if (hudCanvas == null && GameObject.Find("HUDCanvas") == null)
         {
             CreateHUD();
         }
     }
 
-    /// <summary>
-    /// ค้นหาและเชื่อมโยงกับ UI GameObjects ที่อยู่ใน Hierarchy อัตโนมัติ
-    /// </summary>
     public void BindHierarchyUI()
     {
         if (hudCanvas == null)
@@ -101,6 +92,13 @@ public class GameManager : MonoBehaviour
             {
                 Transform t = hudCanvas.transform.Find("SpeedText");
                 if (t != null) speedText = t.GetComponent<Text>();
+            }
+
+            // 🌟 เช็คหา Status UI
+            if (statusText == null)
+            {
+                Transform t = hudCanvas.transform.Find("StatusText");
+                if (t != null) statusText = t.GetComponent<Text>();
             }
 
             if (controlsPanel == null)
@@ -136,7 +134,6 @@ public class GameManager : MonoBehaviour
                 if (t != null) mainMenuButton = t.GetComponent<Button>();
             }
 
-            // ซ่อน GameOverPanel ตอนเริ่มเกม
             gameOverPanel.SetActive(false);
         }
 
@@ -159,7 +156,6 @@ public class GameManager : MonoBehaviour
         {
             survivalTime += Time.deltaTime;
 
-            // Restart game with R key
             bool restartPressed = false;
 #if ENABLE_INPUT_SYSTEM
             if (Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame) restartPressed = true;
@@ -171,7 +167,6 @@ public class GameManager : MonoBehaviour
                 RestartGame();
             }
 
-            // Update Ball Speed on HUD
             if (activeBall == null)
             {
                 activeBall = FindAnyObjectByType<BouncingBall>();
@@ -184,10 +179,30 @@ public class GameManager : MonoBehaviour
                     ? new Color(1f, 0.6f, 0.1f)
                     : new Color(0.3f, 0.9f, 1f);
             }
+
+            // 🌟 อัปเดต UI แสดงสถานะของลูกบอล (Buffs) ที่สามารถซ้อนทับกันได้
+            if (statusText != null && activeBall != null)
+            {
+                System.Collections.Generic.List<string> statuses = new System.Collections.Generic.List<string>();
+                
+                if (activeBall.hasIceEffect) statuses.Add("❄️ ICE");
+                if (activeBall.isExplosive) statuses.Add("🔥 EXPLODE");
+                if (activeBall.isOrbiting) statuses.Add("🌀 ORBIT");
+
+                if (statuses.Count > 0)
+                {
+                    statusText.text = "Buffs: " + string.Join(" + ", statuses);
+                    statusText.color = new Color(1f, 0.85f, 0.3f);
+                }
+                else
+                {
+                    statusText.text = "Buffs: None";
+                    statusText.color = new Color(0.6f, 0.6f, 0.6f);
+                }
+            }
         }
         else
         {
-            // ทางลัดขณะ Game Over
             bool rPressed = false;
             bool mPressed = false;
 #if ENABLE_INPUT_SYSTEM
@@ -226,15 +241,11 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// เรียกใช้เมื่อผู้เล่นตายเพื่อแสดงผลหน้าจอ Game Over
-    /// </summary>
     public void TriggerGameOver()
     {
         if (isGameOver) return;
         isGameOver = true;
 
-        // ปลดล็อกเคอร์เซอร์เมาส์ให้คลิกปุ่ม UI ได้
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
 
@@ -336,6 +347,23 @@ public class GameManager : MonoBehaviour
         speedRect.pivot = new Vector2(1f, 1f);
         speedRect.anchoredPosition = new Vector2(-25, -20);
         speedRect.sizeDelta = new Vector2(300, 40);
+
+        // 🌟 Status Tag (สร้างข้อความบอกบัฟใต้บอกความเร็ว)
+        GameObject statusObj = new GameObject("StatusText");
+        statusObj.transform.SetParent(canvasObj.transform, false);
+        statusText = statusObj.AddComponent<Text>();
+        statusText.font = defaultFont;
+        statusText.fontSize = 20;
+        statusText.fontStyle = FontStyle.Bold;
+        statusText.alignment = TextAnchor.UpperRight;
+        statusText.color = new Color(0.6f, 0.6f, 0.6f);
+        statusText.text = "Buffs: None";
+        RectTransform statusRect = statusObj.GetComponent<RectTransform>();
+        statusRect.anchorMin = new Vector2(1f, 1f);
+        statusRect.anchorMax = new Vector2(1f, 1f);
+        statusRect.pivot = new Vector2(1f, 1f);
+        statusRect.anchoredPosition = new Vector2(-25, -60); 
+        statusRect.sizeDelta = new Vector2(400, 40);
 
         // Bottom Left Controls Panel
         controlsPanel = new GameObject("ControlsPanel");
