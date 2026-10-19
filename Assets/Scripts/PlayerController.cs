@@ -15,6 +15,7 @@ public class PlayerController : MonoBehaviour
     public float maxPlayerHealth = 100f;
     public float currentPlayerHealth;
     public Slider playerHealthSlider; // ลาก Slider UI ของผู้เล่นมาใส่ที่นี่ใน Inspector
+    public Text playerHpText; // ข้อความแสดงตัวเลข HP เช่น 100 / 100
 
     [Header("Dash Settings")]
     public float dashSpeed = 25f;
@@ -61,6 +62,10 @@ public class PlayerController : MonoBehaviour
     private Vector3 moveInput = Vector3.zero;
     private Camera mainCam;
 
+    [Header("Death & State")]
+    private bool isDead = false;
+    public bool IsDead => isDead;
+
     private void Awake()
     {
         currentPlayerHealth = maxPlayerHealth; // 🌟 กำหนดเลือดเริ่มต้น
@@ -75,18 +80,152 @@ public class PlayerController : MonoBehaviour
 
     private void Start()
     {
+        EnsureHealthUI();
         UpdatePlayerHealthUI();
+    }
+
+    private void EnsureHealthUI()
+    {
+        if (playerHealthSlider == null)
+        {
+            // ค้นหาใน Hierarchy ก่อน
+            GameObject hpSliderObj = GameObject.Find("PlayerHPSlider");
+            if (hpSliderObj != null)
+            {
+                playerHealthSlider = hpSliderObj.GetComponent<Slider>();
+            }
+        }
+
+        if (playerHpText == null)
+        {
+            GameObject hpTextObj = GameObject.Find("HPValueText");
+            if (hpTextObj != null)
+            {
+                playerHpText = hpTextObj.GetComponent<Text>();
+            }
+        }
+
+        if (playerHealthSlider != null) return;
+
+        // ค้นหาหรือสร้าง HUDCanvas
+        GameObject canvasObj = GameObject.Find("HUDCanvas");
+        if (canvasObj == null)
+        {
+            canvasObj = new GameObject("HUDCanvas");
+            Canvas canvas = canvasObj.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            CanvasScaler scaler = canvasObj.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920, 1080);
+            scaler.matchWidthOrHeight = 0.5f;
+            canvasObj.AddComponent<GraphicRaycaster>();
+        }
+
+        Font defaultFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf") ?? Resources.GetBuiltinResource<Font>("Arial.ttf");
+
+        // Player HP Panel (มุมบนซ้าย)
+        GameObject hpPanel = new GameObject("PlayerHPPanel");
+        hpPanel.transform.SetParent(canvasObj.transform, false);
+        RectTransform panelRect = hpPanel.AddComponent<RectTransform>();
+        panelRect.anchorMin = new Vector2(0f, 1f);
+        panelRect.anchorMax = new Vector2(0f, 1f);
+        panelRect.pivot = new Vector2(0f, 1f);
+        panelRect.anchoredPosition = new Vector2(30, -30);
+        panelRect.sizeDelta = new Vector2(320, 68);
+
+        Image panelBg = hpPanel.AddComponent<Image>();
+        panelBg.color = new Color(0.06f, 0.08f, 0.12f, 0.9f);
+
+        // Label: "❤️ PLAYER HEALTH"
+        GameObject hpLabelObj = new GameObject("HPLabel");
+        hpLabelObj.transform.SetParent(hpPanel.transform, false);
+        Text hpLabel = hpLabelObj.AddComponent<Text>();
+        hpLabel.font = defaultFont;
+        hpLabel.fontSize = 17;
+        hpLabel.fontStyle = FontStyle.Bold;
+        hpLabel.color = new Color(1f, 0.85f, 0.85f);
+        hpLabel.text = "❤️ PLAYER HEALTH";
+        RectTransform labelRect = hpLabelObj.GetComponent<RectTransform>();
+        labelRect.anchorMin = new Vector2(0f, 1f);
+        labelRect.anchorMax = new Vector2(0f, 1f);
+        labelRect.pivot = new Vector2(0f, 1f);
+        labelRect.anchoredPosition = new Vector2(15, -8);
+        labelRect.sizeDelta = new Vector2(180, 24);
+
+        // HP Value Text (เช่น "100 / 100")
+        GameObject valObj = new GameObject("HPValueText");
+        valObj.transform.SetParent(hpPanel.transform, false);
+        playerHpText = valObj.AddComponent<Text>();
+        playerHpText.font = defaultFont;
+        playerHpText.fontSize = 16;
+        playerHpText.fontStyle = FontStyle.Bold;
+        playerHpText.alignment = TextAnchor.MiddleRight;
+        playerHpText.color = new Color(0.3f, 0.95f, 0.5f);
+        playerHpText.text = $"{Mathf.CeilToInt(currentPlayerHealth)} / {Mathf.CeilToInt(maxPlayerHealth)}";
+        RectTransform valRect = valObj.GetComponent<RectTransform>();
+        valRect.anchorMin = new Vector2(1f, 1f);
+        valRect.anchorMax = new Vector2(1f, 1f);
+        valRect.pivot = new Vector2(1f, 1f);
+        valRect.anchoredPosition = new Vector2(-15, -8);
+        valRect.sizeDelta = new Vector2(100, 24);
+
+        // Slider Object
+        GameObject sliderObj = new GameObject("PlayerHPSlider");
+        sliderObj.transform.SetParent(hpPanel.transform, false);
+        playerHealthSlider = sliderObj.AddComponent<Slider>();
+        playerHealthSlider.interactable = false;
+        RectTransform sliderRect = sliderObj.GetComponent<RectTransform>();
+        sliderRect.anchorMin = new Vector2(0f, 0f);
+        sliderRect.anchorMax = new Vector2(1f, 0f);
+        sliderRect.pivot = new Vector2(0.5f, 0f);
+        sliderRect.anchoredPosition = new Vector2(0, 12);
+        sliderRect.sizeDelta = new Vector2(-30, 20);
+
+        // Slider Background Bar
+        GameObject bgObj = new GameObject("Background");
+        bgObj.transform.SetParent(sliderObj.transform, false);
+        Image bgImg = bgObj.AddComponent<Image>();
+        bgImg.color = new Color(0.2f, 0.05f, 0.05f, 0.95f);
+        RectTransform bgRect = bgObj.GetComponent<RectTransform>();
+        bgRect.anchorMin = Vector2.zero;
+        bgRect.anchorMax = Vector2.one;
+        bgRect.sizeDelta = Vector2.zero;
+
+        // Fill Area
+        GameObject fillArea = new GameObject("Fill Area");
+        fillArea.transform.SetParent(sliderObj.transform, false);
+        RectTransform fillAreaRect = fillArea.AddComponent<RectTransform>();
+        fillAreaRect.anchorMin = Vector2.zero;
+        fillAreaRect.anchorMax = Vector2.one;
+        fillAreaRect.sizeDelta = Vector2.zero;
+
+        // Fill Image
+        GameObject fillObj = new GameObject("Fill");
+        fillObj.transform.SetParent(fillArea.transform, false);
+        Image fillImg = fillObj.AddComponent<Image>();
+        fillImg.color = new Color(0.25f, 0.85f, 0.4f);
+        RectTransform fillRect = fillObj.GetComponent<RectTransform>();
+        fillRect.anchorMin = Vector2.zero;
+        fillRect.anchorMax = Vector2.one;
+        fillRect.sizeDelta = Vector2.zero;
+
+        playerHealthSlider.fillRect = fillRect;
+        playerHealthSlider.minValue = 0f;
+        playerHealthSlider.maxValue = 1f;
+        playerHealthSlider.value = 1f;
     }
 
     // 🌟 ฟังก์ชันรับดาเมจเมื่อถูกศัตรูโจมตี
     public void TakeDamage(float damageAmount)
     {
+        if (isDead) return;
+
         currentPlayerHealth = Mathf.Max(0, currentPlayerHealth - damageAmount);
         UpdatePlayerHealthUI();
 
         if (SoundEffects.Instance != null)
         {
-            // SoundEffects.Instance.PlayPlayerHurt(); // ถ้ามีเสียงโดนตี
+            SoundEffects.Instance.PlayPlayerHurt();
         }
 
         if (currentPlayerHealth <= 0f)
@@ -97,16 +236,59 @@ public class PlayerController : MonoBehaviour
 
     private void UpdatePlayerHealthUI()
     {
+        float ratio = Mathf.Clamp01(currentPlayerHealth / maxPlayerHealth);
+
         if (playerHealthSlider != null)
         {
-            playerHealthSlider.value = currentPlayerHealth / maxPlayerHealth;
+            playerHealthSlider.value = ratio;
+            if (playerHealthSlider.fillRect != null)
+            {
+                Image fillImg = playerHealthSlider.fillRect.GetComponent<Image>();
+                if (fillImg != null)
+                {
+                    // เปลี่ยนสีตามระดับเลือด: เขียว -> เหลือง -> แดง
+                    fillImg.color = (ratio > 0.5f)
+                        ? Color.Lerp(Color.yellow, new Color(0.2f, 0.85f, 0.4f), (ratio - 0.5f) * 2f)
+                        : Color.Lerp(new Color(0.95f, 0.2f, 0.2f), Color.yellow, ratio * 2f);
+                }
+            }
+        }
+
+        if (playerHpText != null)
+        {
+            playerHpText.text = $"{Mathf.CeilToInt(currentPlayerHealth)} / {Mathf.CeilToInt(maxPlayerHealth)}";
+            playerHpText.color = (ratio > 0.3f) ? new Color(0.9f, 0.95f, 1f) : new Color(1f, 0.3f, 0.3f);
         }
     }
 
     private void Die()
     {
-        Debug.Log("Player Died!");
-        // โค้ดจัดการเมื่อผู้เล่นตาย เช่น Restart Game
+        if (isDead) return;
+        isDead = true;
+        Debug.Log("💀 Player Died!");
+
+        StopMagnet();
+
+        if (SoundEffects.Instance != null)
+        {
+            SoundEffects.Instance.PlayPlayerDeath();
+        }
+
+        // ปิด Collider เพื่อไม่ให้ชนซ้ำ
+        Collider col = GetComponent<Collider>();
+        if (col != null) col.enabled = false;
+
+        // สั่ง GameManager แสดงหน้าจอ Game Over
+        if (GameManager.Instance == null)
+        {
+            GameObject gmObj = new GameObject("GameManager");
+            gmObj.AddComponent<GameManager>();
+        }
+
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.TriggerGameOver();
+        }
     }
 
     private void SetupTrajectoryLine()
@@ -143,6 +325,13 @@ public class PlayerController : MonoBehaviour
 
     private void Update()
     {
+        if (isDead)
+        {
+            if (trajectoryLine != null) trajectoryLine.positionCount = 0;
+            if (rangeIndicatorLine != null) rangeIndicatorLine.enabled = false;
+            return;
+        }
+
         ReadInput();
 
         if (CheckDashAction() && Time.time >= lastDashTime + dashCooldown && !isDashing)

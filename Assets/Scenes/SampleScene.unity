@@ -633,6 +633,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GameManager
   enemiesDefeated: 0
   score: 0
+  showHUD: 0
 --- !u!4 &733672134
 Transform:
   m_ObjectHideFlags: 0
@@ -1814,10 +1815,10 @@ SceneRoots:
   m_Roots:
   - {fileID: 330585546}
   - {fileID: 410087041}
+  - {fileID: 733672134}
   - {fileID: 832575519}
   - {fileID: 367864875}
   - {fileID: 1771628840}
   - {fileID: 1219123297}
   - {fileID: 1191096163}
-  - {fileID: 733672134}
   - {fileID: 1747366699}
