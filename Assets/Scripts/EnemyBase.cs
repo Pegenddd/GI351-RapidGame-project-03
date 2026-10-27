@@ -13,13 +13,14 @@ public class EnemyBase : MonoBehaviour
     public float currentHealth;
 
     [Header("Movement & Combat Settings")]
-    public float moveSpeed = 4f;                 // ความเร็วในการวิ่งไล่ตามผู้เล่น
-    public float attackRange = 2.0f;              // ระยะประชิดที่ศัตรูจะเริ่มหยุดเพื่อร่ายสกิลโจมตีพื้น (ปรับให้แคบลงเพื่อจะได้วิ่งเข้าหาก่อน)
-    public float attackCooldown = 3.0f;         // คูลดาวน์ระหว่างการโจมตีแต่ละครั้ง
+    public float moveSpeed = 4f;                  // ความเร็วในการวิ่งไล่ตามผู้เล่น
+    public float attackRange = 2.0f;              // ระยะประชิดที่ศัตรูจะเริ่มหยุดเพื่อร่ายสกิลโจมตีพื้น
+    public float attackCooldown = 3.0f;           // คูลดาวน์ระหว่างการโจมตีแต่ละครั้ง
     public float attackDamage = 15f;              // ดาเมจที่ทำใส่ผู้เล่น
 
     private float lastAttackTime = -999f;
     private bool isAttacking = false;
+    private GameObject currentTelegraphIndicator; // 🌟 ตัวแปรเก็บอ้างอิงกล่องเตือนบนพื้น
 
     [Header("Death Explosion Settings")]
     [Tooltip("เปิดใช้งานระเบิดตัวเองเมื่อตายเพื่อทำดาเมจใส่ศัตรูรอบข้าง")]
@@ -135,17 +136,17 @@ public class EnemyBase : MonoBehaviour
         float boxSize = 3.5f;           // ขนาดพื้นที่สี่เหลี่ยม
 
         // สร้างสี่เหลี่ยมสีแดงเตือนบนพื้น (Telegraph Box)
-        GameObject indicator = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        indicator.name = "AttackTelegraphBox";
-        indicator.transform.position = targetPos;
-        indicator.transform.localScale = new Vector3(boxSize, 0.02f, boxSize);
+        currentTelegraphIndicator = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        currentTelegraphIndicator.name = "AttackTelegraphBox";
+        currentTelegraphIndicator.transform.position = targetPos;
+        currentTelegraphIndicator.transform.localScale = new Vector3(boxSize, 0.02f, boxSize);
 
         // ปิด Collider ของตัวกล่องเตือนไม่ให้เกะกะการชน
-        Collider col = indicator.GetComponent<Collider>();
+        Collider col = currentTelegraphIndicator.GetComponent<Collider>();
         if (col != null) Destroy(col);
 
         // ตั้งค่า Material ให้เป็นสีแดงกึ่งโปร่งใส
-        Renderer indRenderer = indicator.GetComponent<Renderer>();
+        Renderer indRenderer = currentTelegraphIndicator.GetComponent<Renderer>();
         Material indMat = new Material(Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default"));
         indMat.color = new Color(1f, 0f, 0f, 0.35f);
         indRenderer.material = indMat;
@@ -153,6 +154,9 @@ public class EnemyBase : MonoBehaviour
         float elapsed = 0f;
         while (elapsed < telegraphDuration)
         {
+            // ถ้าศัตรูตายกลางคัน ให้หยุดร่ายทันที
+            if (isDead) yield break;
+
             elapsed += Time.deltaTime;
             // ทำให้สีแดงกระพริบเตือนความถี่สูงขึ้นเรื่อยๆ ก่อนระเบิด
             float alpha = Mathf.Lerp(0.2f, 0.7f, Mathf.PingPong(elapsed * 6f, 1f));
@@ -175,7 +179,11 @@ public class EnemyBase : MonoBehaviour
         }
 
         // ลบกล่องเตือนบนพื้นทิ้ง
-        Destroy(indicator);
+        if (currentTelegraphIndicator != null)
+        {
+            Destroy(currentTelegraphIndicator);
+            currentTelegraphIndicator = null;
+        }
 
         // หน่วงเวลาหลังโจมตีเสร็จเล็กน้อยก่อนกลับมาเดินไล่ล่าต่อ
         yield return new WaitForSeconds(0.5f);
@@ -293,6 +301,13 @@ public class EnemyBase : MonoBehaviour
     {
         if (isDead) return;
         isDead = true;
+
+        // 🌟 เคลียร์กล่องเตือนบนพื้นทิ้งทันทีเมื่อศัตรูตาย
+        if (currentTelegraphIndicator != null)
+        {
+            Destroy(currentTelegraphIndicator);
+            currentTelegraphIndicator = null;
+        }
 
         // ระบบระเบิดตัวเองตอนตาย เพื่อทำดาเมจใส่ศัตรูรอบข้าง
         if (enableDeathExplosion)
