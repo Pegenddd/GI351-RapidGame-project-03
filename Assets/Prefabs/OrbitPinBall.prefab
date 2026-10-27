@@ -69,7 +69,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 0c67006d4dc47864995a7b5c0c25b815, type: 2}
+  - {fileID: 2100000, guid: c9dd12f1f82c96e4c87861a394b26d1f, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -154,8 +154,8 @@ MonoBehaviour:
   initialOrbitSpeed: 150
   maxOrbitSpeed: 500
   speedRampRate: 60
-  pullRadius: 100
-  pullSpeed: 6
+  pullRadius: 12
+  pullSpeed: 3
   stopDistance: 3
   explosionRadius: 5
   explosionDamage: 80
