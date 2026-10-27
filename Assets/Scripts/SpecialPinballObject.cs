@@ -58,7 +58,8 @@ public class SpecialPinballObject : MonoBehaviour
                 Collider triggerCol = GetComponent<Collider>();
                 if (triggerCol != null) triggerCol.enabled = false;
 
-                StartCoroutine(ContinuousPullAndDestroyRoutine());
+                // 🌟 ส่ง ball เข้าไปใน Coroutine เพื่อให้เช็คสถานะได้
+                StartCoroutine(ContinuousPullAndDestroyRoutine(ball));
                 break;
 
             /* Explode Pinball */
@@ -75,7 +76,7 @@ public class SpecialPinballObject : MonoBehaviour
         }
     }
 
-    private IEnumerator ContinuousPullAndDestroyRoutine()
+    private IEnumerator ContinuousPullAndDestroyRoutine(BouncingBall activeBall)
     {
         float elapsed = 0f;
         // เก็บรายชื่อศัตรูที่กำลังโดนดึงเพื่อใช้คืนสถานะตอนจบ
@@ -83,6 +84,13 @@ public class SpecialPinballObject : MonoBehaviour
 
         while (elapsed < orbitDuration)
         {
+            // 🌟 เช็คว่าลูกบอลยังคงหมุนอยู่รอบเสานี้หรือไม่
+            if (activeBall == null || !activeBall.isOrbiting || activeBall.orbitTargetTransform != transform)
+            {
+                // ถ้าบอลหลุดออกไปแล้ว ให้หยุดวงจรการดูดทันที (Break ออกจากลูป)
+                break;
+            }
+
             elapsed += Time.deltaTime;
 
             Collider[] colliders = Physics.OverlapSphere(transform.position, pullRadius);
@@ -112,7 +120,7 @@ public class SpecialPinballObject : MonoBehaviour
             yield return null;
         }
 
-        // เมื่อหมดเวลาดึงดูด คืนสถานะการเดินปกติให้ศัตรูทั้งหมดที่เคยโดนดึง
+        // เมื่อหมดเวลาดึงดูด หรือลูกบอลหลุดออกไปแล้ว คืนสถานะการเดินปกติให้ศัตรูทั้งหมดที่เคยโดนดึง
         foreach (var enemy in pulledEnemies)
         {
             if (enemy != null)
@@ -121,6 +129,7 @@ public class SpecialPinballObject : MonoBehaviour
             }
         }
 
+        // ทำลายเสาทิ้งเมื่อจบการทำงาน
         Destroy(gameObject);
     }
 

@@ -132,8 +132,11 @@ MonoBehaviour:
   currentHealth: 0
   moveSpeed: 8
   attackRange: 1.8
-  attackPauseDuration: 1
-  attackDamage: 10
+  attackCooldown: 3
+  attackDamage: 5
+  enableDeathExplosion: 1
+  deathExplosionRadius: 4
+  deathExplosionDamage: 50
   flashColor: {r: 1, g: 1, b: 1, a: 1}
   flashDuration: 0.1
   showHealthBar: 1

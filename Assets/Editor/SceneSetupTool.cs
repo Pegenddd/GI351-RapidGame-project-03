@@ -23,6 +23,11 @@ public static class SceneSetupTool
 
     private static void CheckAndSetupScene()
     {
+        if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+
+        Scene activeScene = EditorSceneManager.GetActiveScene();
+        if (!activeScene.isLoaded || activeScene.name.ToLower().Contains("menu")) return;
+
         // Only run if Arena or Player doesn't exist yet in the scene
         if (GameObject.Find("Arena") == null || GameObject.Find("Player") == null)
         {
@@ -32,6 +37,8 @@ public static class SceneSetupTool
 
     public static void ExecuteSetup(bool forceRebuild)
     {
+        if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+
         Scene activeScene = EditorSceneManager.GetActiveScene();
         if (!activeScene.isLoaded) return;
 
@@ -189,10 +196,16 @@ public static class SceneSetupTool
             SafeDestroy(legacySetup);
         }
 
-        // 8. Mark scene dirty and save
-        EditorSceneManager.MarkSceneDirty(activeScene);
-        EditorSceneManager.SaveScene(activeScene);
-        AssetDatabase.SaveAssets();
+        // 8. Generate and bind all UI in Hierarchy
+        HierarchyUISetupTool.SetupActiveGameSceneUI();
+
+        // 8. Mark scene dirty and save (only in edit mode)
+        if (!EditorApplication.isPlayingOrWillChangePlaymode && activeScene.isLoaded)
+        {
+            EditorSceneManager.MarkSceneDirty(activeScene);
+            EditorSceneManager.SaveScene(activeScene);
+            AssetDatabase.SaveAssets();
+        }
 
         Debug.Log("✅ [SceneSetupTool] Scene successfully updated and saved! All objects are now editable directly in the Scene Hierarchy.");
     }

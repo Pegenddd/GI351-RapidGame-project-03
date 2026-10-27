@@ -18,6 +18,10 @@ public class EnemySpawner : MonoBehaviour
     [Header("Spawn Points")]
     public List<Transform> spawnPoints = new List<Transform>();
 
+    [Header("Spawn Offset Settings")]
+    [Tooltip("ปรับค่านี้ใน Inspector เพื่อยกตัวศัตรูขึ้นจากพื้น (แก้ปัญหาจมดิน)")]
+    public float spawnHeightOffset = 1.5f;
+
     [Header("Balance & Scaling Settings")]
     [Tooltip("จำนวนศัตรูสูงสุดที่อนุญาตให้มีในฉากพร้อมกัน")]
     public int maxEnemiesInScene = 25;
@@ -39,7 +43,7 @@ public class EnemySpawner : MonoBehaviour
         gameTimer += Time.deltaTime;
         spawnTimer += Time.deltaTime;
 
-        // คำนวณช่วงเวลาเกิดที่จะสั้นลงเรื่อยๆ ตามเวลาที่ผ่านไป (เกมยิ่งเล่นยิ่งเดือด)
+        // คำนวณช่วงเวลาเกิดที่จะสั้นลงเรื่อยๆ ตามเวลาที่ผ่านไป
         float currentInterval = Mathf.Max(0.2f, baseSpawnInterval - (gameTimer / 60f) * difficultyMultiplierPerMinute);
 
         if (spawnTimer >= currentInterval)
@@ -47,7 +51,7 @@ public class EnemySpawner : MonoBehaviour
             spawnTimer = 0f;
 
             // เช็กจำนวนมอนสเตอร์ปัจจุบันในฉาก
-            int currentEnemyCount = FindObjectsByType<EnemyController>(FindObjectsInactive.Exclude, FindObjectsSortMode.None).Length;
+            int currentEnemyCount = FindObjectsByType<EnemyBase>(FindObjectsInactive.Exclude, FindObjectsSortMode.None).Length;
 
             if (currentEnemyCount < maxEnemiesInScene)
             {
@@ -66,8 +70,9 @@ public class EnemySpawner : MonoBehaviour
         EnemySpawnData selectedData = GetWeightedRandomEnemyData();
         if (selectedData == null || selectedData.enemyPrefab == null) return;
 
-        // 3. สร้างศัตรู
-        Instantiate(selectedData.enemyPrefab, sp.position, sp.rotation);
+        // 3. สร้างศัตรูพร้อมบวกความสูงตามค่าที่ตั้งไว้ใน Inspector
+        Vector3 spawnPos = sp.position + (Vector3.up * spawnHeightOffset);
+        Instantiate(selectedData.enemyPrefab, spawnPos, sp.rotation);
     }
 
     private EnemySpawnData GetWeightedRandomEnemyData()

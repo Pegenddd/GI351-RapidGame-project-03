@@ -14,6 +14,9 @@ public class SoundEffects : MonoBehaviour
     private AudioClip bounceClip;
     private AudioClip enemyHurtClip;
     private AudioClip enemyDieClip;
+    private AudioClip playerHurtClip;
+    private AudioClip playerDieClip;
+    private AudioClip buttonClickClip;
 
     private void Awake()
     {
@@ -37,6 +40,9 @@ public class SoundEffects : MonoBehaviour
         bounceClip = CreateToneClip("BouncePing", 0.12f, 520f, 680f);
         enemyHurtClip = CreateSquishClip("EnemyHurt", 0.18f, 320f, 90f);
         enemyDieClip = CreateExplosionClip("EnemyDie", 0.35f, 220f, 40f);
+        playerHurtClip = CreateSquishClip("PlayerHurt", 0.22f, 260f, 110f);
+        playerDieClip = CreateExplosionClip("PlayerDie", 0.65f, 180f, 35f);
+        buttonClickClip = CreateToneClip("ButtonClick", 0.08f, 750f, 950f);
     }
 
     public void PlaySwing() => Play(swingClip, 0.7f, Random.Range(0.95f, 1.05f));
@@ -44,6 +50,9 @@ public class SoundEffects : MonoBehaviour
     public void PlayBounce() => Play(bounceClip, 0.6f, Random.Range(0.9f, 1.1f));
     public void PlayEnemyHurt() => Play(enemyHurtClip, 0.9f, Random.Range(0.9f, 1.2f));
     public void PlayEnemyDie() => Play(enemyDieClip, 1.0f, Random.Range(0.85f, 1.05f));
+    public void PlayPlayerHurt() => Play(playerHurtClip, 0.95f, Random.Range(0.9f, 1.1f));
+    public void PlayPlayerDeath() => Play(playerDieClip, 1.0f, 0.85f);
+    public void PlayButtonClick() => Play(buttonClickClip, 0.8f, 1.0f);
 
     private void Play(AudioClip clip, float volume, float pitch)
     {
