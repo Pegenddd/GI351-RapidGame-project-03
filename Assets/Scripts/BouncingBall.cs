@@ -28,11 +28,10 @@ public class BouncingBall : MonoBehaviour
     private bool isAttachedToPlayer = false;
     private Transform playerTransform;
 
-    // 🌟 เปลี่ยนตัวแปรสถานะให้เป็น public เพื่อให้ GameManager ดึงไปแสดงบน UI ได้
     public bool isExplosive = false;
     private float explosionRadius = 5f;
     private float explosionDamage = 80f;
-    private bool explodeOnlyOnEnemy = false; 
+    private bool explodeOnlyOnEnemy = false;
 
     public bool hasIceEffect = false;
     private float storedSlowFactor = 0.4f;
@@ -40,7 +39,7 @@ public class BouncingBall : MonoBehaviour
 
     public bool isOrbiting = false;
     public Transform orbitTargetTransform;
-    
+
     private float orbitAngle = 0f;
     private float orbitRadius = 2.5f;
     private float currentOrbitSpeed = 150f;
@@ -197,8 +196,8 @@ public class BouncingBall : MonoBehaviour
         Vector3 dir = transform.position - centerTarget.position;
         orbitAngle = Mathf.Atan2(dir.z, dir.x) * Mathf.Rad2Deg;
         orbitRadius = Mathf.Max(1.5f, dir.magnitude);
-        
-        UpdateVisuals(); // 🌟 อัปเดตเพื่อให้ UI รู้ทันที
+
+        UpdateVisuals();
     }
 
     private void ExitOrbitState()
@@ -222,8 +221,8 @@ public class BouncingBall : MonoBehaviour
 
     public void ApplySlowDown(float slowFactor)
     {
-        currentSpeed *= slowFactor; 
-        currentSpeed = Mathf.Max(currentSpeed, 3f); 
+        currentSpeed *= slowFactor;
+        currentSpeed = Mathf.Max(currentSpeed, 3f);
         UpdateVisuals();
     }
 
@@ -247,8 +246,7 @@ public class BouncingBall : MonoBehaviour
             if (enemy != null)
             {
                 enemy.TakeDamage(explosionDamage, enemy.transform.position, (enemy.transform.position - hitPoint).normalized);
-                
-                // 🌟 [ระบบคอมโบ]: หากมีสถานะน้ำแข็งซ้อนทับอยู่ด้วย ระเบิดจะทำการแช่แข็งศัตรูทั้งกลุ่มพร้อมกัน!
+
                 if (hasIceEffect)
                 {
                     enemy.ApplySlowEffect(storedSlowFactor, storedSlowDuration);
@@ -256,11 +254,10 @@ public class BouncingBall : MonoBehaviour
             }
         }
 
-        // ล้างสถานะทั้งหมดทิ้งเมื่อใช้งานเสร็จ
         isExplosive = false;
         explodeOnlyOnEnemy = false;
-        hasIceEffect = false; 
-        
+        hasIceEffect = false;
+
         UpdateVisuals();
     }
 
@@ -277,7 +274,7 @@ public class BouncingBall : MonoBehaviour
                 clonedBall.moveDirection = rot * Vector3.forward;
                 clonedBall.currentSpeed = baseSpeed;
                 clonedBall.isExplosive = false;
-                clonedBall.hasIceEffect = false; // ของโคลนเริ่มใหม่ไม่มีบัฟ
+                clonedBall.hasIceEffect = false;
                 clonedBall.explodeOnlyOnEnemy = false;
 
                 Destroy(clone, duration);
@@ -348,29 +345,6 @@ public class BouncingBall : MonoBehaviour
             }
         }
 
-        Vector3 curPos = transform.position;
-        float boundary = 14.2f;
-        bool bouncedWall = false;
-
-        if (curPos.x > boundary) { curPos.x = boundary; moveDirection.x = -Mathf.Abs(moveDirection.x); bouncedWall = true; }
-        else if (curPos.x < -boundary) { curPos.x = -boundary; moveDirection.x = Mathf.Abs(moveDirection.x); bouncedWall = true; }
-
-        if (curPos.z > boundary) { curPos.z = boundary; moveDirection.z = -Mathf.Abs(moveDirection.z); bouncedWall = true; }
-        else if (curPos.z < -boundary) { curPos.z = -boundary; moveDirection.z = Mathf.Abs(moveDirection.z); bouncedWall = true; }
-
-        if (bouncedWall)
-        {
-            transform.position = curPos;
-            moveDirection.y = 0;
-            moveDirection.Normalize();
-            PlayBounceEffect(transform.position);
-
-            if (isExplosive && !explodeOnlyOnEnemy)
-            {
-                TriggerExplosion(transform.position);
-            }
-        }
-
         Collider[] overlaps = Physics.OverlapSphere(transform.position, radius + 0.1f);
         foreach (var col in overlaps)
         {
@@ -422,12 +396,10 @@ public class BouncingBall : MonoBehaviour
 
         if (isExplosive)
         {
-            // ถ้าระเบิด มันจะทำความเสียหายหมู่ + ถ่ายทอดสถานะน้ำแข็งหมู่(ถ้ามี) ในฟังก์ชัน TriggerExplosion ทันที
             TriggerExplosion(contactPoint);
         }
         else if (hasIceEffect)
         {
-            // ถ้ามีแค่น้ำแข็งธรรมดา ก็จะส่งสถานะสโลว์ให้เป้าหมายที่โดนตรงๆ
             enemy.ApplySlowEffect(storedSlowFactor, storedSlowDuration);
             hasIceEffect = false;
             UpdateVisuals();
@@ -537,11 +509,10 @@ public class BouncingBall : MonoBehaviour
 
         ParticleSystem ps = expObj.AddComponent<ParticleSystem>();
         var main = ps.main;
-        
-        // 🌟 ถ้าระเบิดติดน้ำแข็งด้วย ให้ใช้ไฟระเบิดสีฟ้า
+
         Color expStartColor = hasIceEffect ? new Color(0.2f, 0.8f, 1f) : Color.red;
         Color expEndColor = hasIceEffect ? Color.white : Color.yellow;
-        
+
         main.startColor = new ParticleSystem.MinMaxGradient(expStartColor, expEndColor);
         main.startSize = new ParticleSystem.MinMaxCurve(0.5f, 1.2f);
         main.startSpeed = new ParticleSystem.MinMaxCurve(6f, 12f);
@@ -563,11 +534,11 @@ public class BouncingBall : MonoBehaviour
 
         if (hasIceEffect && isExplosive)
         {
-            activeColor = new Color(0.8f, 0.2f, 0.9f); // 🌟 สีม่วงอมชมพู เมื่อติด 2 สถานะ
+            activeColor = new Color(0.8f, 0.2f, 0.9f);
         }
         else if (hasIceEffect)
         {
-            activeColor = iceColor; 
+            activeColor = iceColor;
         }
         else if (isExplosive)
         {

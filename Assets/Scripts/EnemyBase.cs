@@ -4,7 +4,7 @@ using UnityEngine.UI;
 
 /// <summary>
 /// Base class for enemies placed directly in the scene.
-/// Handles chasing the player, attacking with a pause, health, and hit flash effect using Material.
+/// Handles chasing the player, attacking with a telegraph area, death explosion, and slow/pull states.
 /// </summary>
 public class EnemyBase : MonoBehaviour
 {
@@ -14,12 +14,18 @@ public class EnemyBase : MonoBehaviour
 
     [Header("Movement & Combat Settings")]
     public float moveSpeed = 4f;                 // ความเร็วในการวิ่งไล่ตามผู้เล่น
-    public float attackRange = 1.8f;              // ระยะประชิดที่ศัตรูจะเริ่มโจมตี
-    public float attackPauseDuration = 0.8f;      // ระยะเวลาที่หยุดยืนรอก่อนไล่ต่อหลังโจมตี
-    public float attackDamage = 10f;              // ดาเมจที่ทำใส่ผู้เล่น
+    public float attackRange = 2.0f;              // ระยะประชิดที่ศัตรูจะเริ่มหยุดเพื่อร่ายสกิลโจมตีพื้น (ปรับให้แคบลงเพื่อจะได้วิ่งเข้าหาก่อน)
+    public float attackCooldown = 3.0f;         // คูลดาวน์ระหว่างการโจมตีแต่ละครั้ง
+    public float attackDamage = 15f;              // ดาเมจที่ทำใส่ผู้เล่น
 
-    private bool isAttackingPause = false;
-    private float pauseTimer = 0f;
+    private float lastAttackTime = -999f;
+    private bool isAttacking = false;
+
+    [Header("Death Explosion Settings")]
+    [Tooltip("เปิดใช้งานระเบิดตัวเองเมื่อตายเพื่อทำดาเมจใส่ศัตรูรอบข้าง")]
+    public bool enableDeathExplosion = true;
+    public float deathExplosionRadius = 4.0f;     // รัศมีแรงระเบิดตอนตาย
+    public float deathExplosionDamage = 50f;      // ดาเมจระเบิดตอนตาย
 
     [Header("Visual Feedback (Flash)")]
     public Color flashColor = Color.white;        // สีตอนโดนตี (สีกระพริบ)
@@ -81,33 +87,26 @@ public class EnemyBase : MonoBehaviour
 
     private void UpdateMovementAndCombat()
     {
-        // ถ้ากำลังโดนแรงดึงดูดของเสาอยู่ จะไม่ให้ AI วิ่งเดินเองตามปกติเพื่อไม่ให้ขัดแย้งกัน
-        if (isBeingPulled) return;
+        // ถ้ากำลังโดนแรงดึงดูดของเสา หรือกำลังร่ายสกิลโจมตีอยู่ จะไม่ให้เดินเองปกติ
+        if (isBeingPulled || isAttacking) return;
 
         if (playerTransform == null) return;
-
-        // ถ้าอยู่ในสถานะหยุดจังหวะหลังโจมตี
-        if (isAttackingPause)
-        {
-            pauseTimer -= Time.deltaTime;
-            if (pauseTimer <= 0f)
-            {
-                isAttackingPause = false; // หมดเวลาหยุด กลับมาวิ่งไล่ต่อ
-            }
-            return;
-        }
 
         // คำนวณระยะห่างระหว่างศัตรูกับผู้เล่น
         Vector3 toPlayer = playerTransform.position - transform.position;
         toPlayer.y = 0;
         float distToPlayer = toPlayer.magnitude;
 
-        // ถ้ายังไม่ถึงระยะประชิด ให้วิ่งไล่ตาม
-        if (distToPlayer > attackRange)
+        // เช็คว่าอยู่ในระยะโจมตีและพ้นคูลดาวน์หรือยัง
+        if (distToPlayer <= attackRange && Time.time >= lastAttackTime + attackCooldown)
         {
+            StartCoroutine(PerformTelegraphAttack());
+        }
+        else if (distToPlayer > attackRange)
+        {
+            // 🌟 วิ่งไล่ตามผู้เล่นอย่างต่อเนื่องเมื่ออยู่นอกระยะโจมตี
             Vector3 moveDir = toPlayer.normalized;
 
-            // เช็กสิ่งกีดขวางด้านหน้าก่อนขยับตัว (ป้องกันการเดินทะลุวัตถุพิเศษ)
             float raycastDist = moveSpeed * Time.deltaTime + 0.3f;
             if (!Physics.Raycast(transform.position + Vector3.up * 0.5f, moveDir, raycastDist))
             {
@@ -118,28 +117,69 @@ public class EnemyBase : MonoBehaviour
             Quaternion targetRot = Quaternion.LookRotation(moveDir, Vector3.up);
             transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, 12f * Time.deltaTime);
         }
-        else
-        {
-            // ประชิดตัวแล้ว -> ทำการโจมตีผู้เล่น
-            AttackPlayer();
-        }
     }
 
-    private void AttackPlayer()
+    /// <summary>
+    /// ระบบโจมตีแบบแสดงพื้นที่เตือนสีแดง (Telegraph) ให้ผู้เล่นหลบ
+    /// </summary>
+    private System.Collections.IEnumerator PerformTelegraphAttack()
     {
-        // สั่งหักเลือดผู้เล่น
-        if (playerTransform != null)
+        isAttacking = true;
+        lastAttackTime = Time.time;
+
+        // จุดศูนย์กลางพื้นที่โจมตี (ตำแหน่งผู้เล่นขณะเริ่มร่าย)
+        Vector3 targetPos = playerTransform != null ? playerTransform.position : transform.position + transform.forward * 3f;
+        targetPos.y = 0.05f; // ให้ลอยเหนือพื้นเล็กน้อยกัน Z-fighting
+
+        float telegraphDuration = 1.2f; // เวลารอให้ผู้เล่นหลบ (วินาที)
+        float boxSize = 3.5f;           // ขนาดพื้นที่สี่เหลี่ยม
+
+        // สร้างสี่เหลี่ยมสีแดงเตือนบนพื้น (Telegraph Box)
+        GameObject indicator = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        indicator.name = "AttackTelegraphBox";
+        indicator.transform.position = targetPos;
+        indicator.transform.localScale = new Vector3(boxSize, 0.02f, boxSize);
+
+        // ปิด Collider ของตัวกล่องเตือนไม่ให้เกะกะการชน
+        Collider col = indicator.GetComponent<Collider>();
+        if (col != null) Destroy(col);
+
+        // ตั้งค่า Material ให้เป็นสีแดงกึ่งโปร่งใส
+        Renderer indRenderer = indicator.GetComponent<Renderer>();
+        Material indMat = new Material(Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default"));
+        indMat.color = new Color(1f, 0f, 0f, 0.35f);
+        indRenderer.material = indMat;
+
+        float elapsed = 0f;
+        while (elapsed < telegraphDuration)
         {
-            PlayerController pc = playerTransform.GetComponent<PlayerController>();
-            if (pc != null)
+            elapsed += Time.deltaTime;
+            // ทำให้สีแดงกระพริบเตือนความถี่สูงขึ้นเรื่อยๆ ก่อนระเบิด
+            float alpha = Mathf.Lerp(0.2f, 0.7f, Mathf.PingPong(elapsed * 6f, 1f));
+            indMat.color = new Color(1f, 0f, 0f, alpha);
+            yield return null;
+        }
+
+        // --- ทำงานเมื่อครบเวลาเตือน (สร้างความเสียหายในพื้นที่) ---
+        Collider[] hits = Physics.OverlapBox(targetPos, new Vector3(boxSize * 0.5f, 2f, boxSize * 0.5f), Quaternion.identity);
+        foreach (var hit in hits)
+        {
+            if (hit.CompareTag("Player") || hit.GetComponent<PlayerController>() != null)
             {
-                pc.TakeDamage(attackDamage);
+                PlayerController pc = hit.GetComponent<PlayerController>() ?? hit.GetComponentInParent<PlayerController>();
+                if (pc != null)
+                {
+                    pc.TakeDamage(attackDamage);
+                }
             }
         }
 
-        // เข้าสู่สถานะหยุด 1 จังหวะ
-        isAttackingPause = true;
-        pauseTimer = attackPauseDuration;
+        // ลบกล่องเตือนบนพื้นทิ้ง
+        Destroy(indicator);
+
+        // หน่วงเวลาหลังโจมตีเสร็จเล็กน้อยก่อนกลับมาเดินไล่ล่าต่อ
+        yield return new WaitForSeconds(0.5f);
+        isAttacking = false;
     }
 
     /// <summary>
@@ -151,28 +191,20 @@ public class EnemyBase : MonoBehaviour
 
         currentHealth = Mathf.Max(0, currentHealth - damageAmount);
 
-        // Update หลอดเลือดบนหัว
         if (healthSlider != null)
         {
             healthSlider.value = currentHealth / maxHealth;
         }
 
-        // เอฟเฟกต์เลือดสาด
         SpawnBloodSplatter(hitPoint, hitDirection);
-
-        // ตัวเลขดาเมจลอยขึ้นมา
         SpawnDamageNumber(damageAmount, hitPoint);
-
-        // สีกระพริบตอนโดนตี (ใช้ Material สีหลักแต่แฟลชทับชั่วคราว)
         TriggerFlashEffect();
 
-        // เสียงตอนโดนตี
         if (SoundEffects.Instance != null)
         {
             SoundEffects.Instance.PlayEnemyHurt();
         }
 
-        // เช็คว่าเลือดหมดหรือยัง
         if (currentHealth <= 0f)
         {
             Die();
@@ -194,8 +226,8 @@ public class EnemyBase : MonoBehaviour
         if (meshRenderer != null)
         {
             meshRenderer.GetPropertyBlock(propBlock);
-            propBlock.SetColor("_BaseColor", color); // URP
-            propBlock.SetColor("_Color", color);     // Legacy
+            propBlock.SetColor("_BaseColor", color);
+            propBlock.SetColor("_Color", color);
             meshRenderer.SetPropertyBlock(propBlock);
         }
     }
@@ -204,7 +236,6 @@ public class EnemyBase : MonoBehaviour
     {
         if (!isDead && meshRenderer != null)
         {
-            // ล้าง PropertyBlock เพื่อให้ Material ดั้งเดิมกลับมาแสดงผลตามปกติ
             meshRenderer.SetPropertyBlock(null);
         }
     }
@@ -260,7 +291,22 @@ public class EnemyBase : MonoBehaviour
 
     private void Die()
     {
+        if (isDead) return;
         isDead = true;
+
+        // ระบบระเบิดตัวเองตอนตาย เพื่อทำดาเมจใส่ศัตรูรอบข้าง
+        if (enableDeathExplosion)
+        {
+            Collider[] colliders = Physics.OverlapSphere(transform.position, deathExplosionRadius);
+            foreach (var col in colliders)
+            {
+                EnemyBase nearbyEnemy = col.GetComponentInParent<EnemyBase>() ?? col.GetComponent<EnemyBase>();
+                if (nearbyEnemy != null && nearbyEnemy != this)
+                {
+                    nearbyEnemy.TakeDamage(deathExplosionDamage, nearbyEnemy.transform.position, (nearbyEnemy.transform.position - transform.position).normalized);
+                }
+            }
+        }
 
         if (SoundEffects.Instance != null)
         {
@@ -317,7 +363,6 @@ public class EnemyBase : MonoBehaviour
         canvasRect.sizeDelta = new Vector2(1.2f, 0.2f);
         canvasRect.localScale = Vector3.one;
 
-        // Background
         GameObject bgObj = new GameObject("BarBackground");
         bgObj.transform.SetParent(healthCanvasObj.transform, false);
         Image bgImage = bgObj.AddComponent<Image>();
@@ -327,7 +372,6 @@ public class EnemyBase : MonoBehaviour
         bgRect.anchorMax = Vector2.one;
         bgRect.sizeDelta = Vector2.zero;
 
-        // Slider
         GameObject sliderObj = new GameObject("HealthSlider");
         sliderObj.transform.SetParent(healthCanvasObj.transform, false);
         healthSlider = sliderObj.AddComponent<Slider>();
@@ -336,7 +380,6 @@ public class EnemyBase : MonoBehaviour
         sliderRect.anchorMax = Vector2.one;
         sliderRect.sizeDelta = Vector2.zero;
 
-        // Fill area
         GameObject fillArea = new GameObject("Fill Area");
         fillArea.transform.SetParent(sliderObj.transform, false);
         RectTransform fillAreaRect = fillArea.AddComponent<RectTransform>();
@@ -344,7 +387,6 @@ public class EnemyBase : MonoBehaviour
         fillAreaRect.anchorMax = Vector2.one;
         fillAreaRect.sizeDelta = Vector2.zero;
 
-        // Fill
         GameObject fill = new GameObject("Fill");
         fill.transform.SetParent(fillArea.transform, false);
         Image fillImage = fill.AddComponent<Image>();
@@ -373,15 +415,14 @@ public class EnemyBase : MonoBehaviour
     {
         if (!isSlowed)
         {
-            originalMoveSpeed = moveSpeed; // บันทึกความเร็วเดิมไว้
-            moveSpeed *= slowFactor;        // สั่งชะลอความเร็ว
+            originalMoveSpeed = moveSpeed;
+            moveSpeed *= slowFactor;
         }
 
         slowTimer = duration;
         isSlowed = true;
     }
 
-    // ฟังก์ชันจับเวลาถอยหลังเพื่อคืนค่าความเร็วเดิมของศัตรู
     private void HandleSlowTimer()
     {
         if (isSlowed)
@@ -389,15 +430,21 @@ public class EnemyBase : MonoBehaviour
             slowTimer -= Time.deltaTime;
             if (slowTimer <= 0f)
             {
-                moveSpeed = originalMoveSpeed; // หมดเวลาสโลว์ คืนค่าความเร็วเดิม
+                moveSpeed = originalMoveSpeed;
                 isSlowed = false;
             }
         }
     }
 
-    // ฟังก์ชันสำหรับเปิด-ปิดสถานะถูกแรงดึงดูดของเสาพินบอลครอบงำ
     public void SetPulledState(bool pulled)
     {
         isBeingPulled = pulled;
+    }
+
+    // วาดเส้นขอบวงกลมแสดงรัศมีระเบิดตอนตายใน Scene View
+    private void OnDrawGizmosSelected()
+    {
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireSphere(transform.position, deathExplosionRadius);
     }
 }

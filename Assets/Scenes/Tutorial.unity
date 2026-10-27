@@ -1120,6 +1120,7 @@ MonoBehaviour:
   - {fileID: 870299589}
   - {fileID: 877471993}
   - {fileID: 1775447506}
+  spawnHeightOffset: 1
   maxEnemiesInScene: 25
   baseSpawnInterval: 3
   difficultyMultiplierPerMinute: 0.35

@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI; // 🌟 เพิ่ม namespace สำหรับ UI
+using UnityEngine.UI;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -14,8 +14,8 @@ public class PlayerController : MonoBehaviour
     [Header("Player Health Settings")]
     public float maxPlayerHealth = 100f;
     public float currentPlayerHealth;
-    public Slider playerHealthSlider; // ลาก Slider UI ของผู้เล่นมาใส่ที่นี่ใน Inspector
-    public Text playerHpText; // ข้อความแสดงตัวเลข HP เช่น 100 / 100
+    public Slider playerHealthSlider;
+    public Text playerHpText;
 
     [Header("Dash Settings")]
     public float dashSpeed = 25f;
@@ -68,7 +68,7 @@ public class PlayerController : MonoBehaviour
 
     private void Awake()
     {
-        currentPlayerHealth = maxPlayerHealth; // 🌟 กำหนดเลือดเริ่มต้น
+        currentPlayerHealth = maxPlayerHealth;
         mainCam = Camera.main;
         if (batTransform != null)
         {
@@ -88,7 +88,6 @@ public class PlayerController : MonoBehaviour
     {
         if (playerHealthSlider == null)
         {
-            // ค้นหาใน Hierarchy ก่อน
             GameObject hpSliderObj = GameObject.Find("PlayerHPSlider");
             if (hpSliderObj != null)
             {
@@ -107,7 +106,6 @@ public class PlayerController : MonoBehaviour
 
         if (playerHealthSlider != null) return;
 
-        // ค้นหาหรือสร้าง HUDCanvas
         GameObject canvasObj = GameObject.Find("HUDCanvas");
         if (canvasObj == null)
         {
@@ -123,7 +121,6 @@ public class PlayerController : MonoBehaviour
 
         Font defaultFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf") ?? Resources.GetBuiltinResource<Font>("Arial.ttf");
 
-        // Player HP Panel (มุมบนซ้าย)
         GameObject hpPanel = new GameObject("PlayerHPPanel");
         hpPanel.transform.SetParent(canvasObj.transform, false);
         RectTransform panelRect = hpPanel.AddComponent<RectTransform>();
@@ -136,7 +133,6 @@ public class PlayerController : MonoBehaviour
         Image panelBg = hpPanel.AddComponent<Image>();
         panelBg.color = new Color(0.06f, 0.08f, 0.12f, 0.9f);
 
-        // Label: "❤️ PLAYER HEALTH"
         GameObject hpLabelObj = new GameObject("HPLabel");
         hpLabelObj.transform.SetParent(hpPanel.transform, false);
         Text hpLabel = hpLabelObj.AddComponent<Text>();
@@ -152,7 +148,6 @@ public class PlayerController : MonoBehaviour
         labelRect.anchoredPosition = new Vector2(15, -8);
         labelRect.sizeDelta = new Vector2(180, 24);
 
-        // HP Value Text (เช่น "100 / 100")
         GameObject valObj = new GameObject("HPValueText");
         valObj.transform.SetParent(hpPanel.transform, false);
         playerHpText = valObj.AddComponent<Text>();
@@ -169,7 +164,6 @@ public class PlayerController : MonoBehaviour
         valRect.anchoredPosition = new Vector2(-15, -8);
         valRect.sizeDelta = new Vector2(100, 24);
 
-        // Slider Object
         GameObject sliderObj = new GameObject("PlayerHPSlider");
         sliderObj.transform.SetParent(hpPanel.transform, false);
         playerHealthSlider = sliderObj.AddComponent<Slider>();
@@ -181,7 +175,6 @@ public class PlayerController : MonoBehaviour
         sliderRect.anchoredPosition = new Vector2(0, 12);
         sliderRect.sizeDelta = new Vector2(-30, 20);
 
-        // Slider Background Bar
         GameObject bgObj = new GameObject("Background");
         bgObj.transform.SetParent(sliderObj.transform, false);
         Image bgImg = bgObj.AddComponent<Image>();
@@ -191,7 +184,6 @@ public class PlayerController : MonoBehaviour
         bgRect.anchorMax = Vector2.one;
         bgRect.sizeDelta = Vector2.zero;
 
-        // Fill Area
         GameObject fillArea = new GameObject("Fill Area");
         fillArea.transform.SetParent(sliderObj.transform, false);
         RectTransform fillAreaRect = fillArea.AddComponent<RectTransform>();
@@ -199,7 +191,6 @@ public class PlayerController : MonoBehaviour
         fillAreaRect.anchorMax = Vector2.one;
         fillAreaRect.sizeDelta = Vector2.zero;
 
-        // Fill Image
         GameObject fillObj = new GameObject("Fill");
         fillObj.transform.SetParent(fillArea.transform, false);
         Image fillImg = fillObj.AddComponent<Image>();
@@ -215,7 +206,6 @@ public class PlayerController : MonoBehaviour
         playerHealthSlider.value = 1f;
     }
 
-    // 🌟 ฟังก์ชันรับดาเมจเมื่อถูกศัตรูโจมตี
     public void TakeDamage(float damageAmount)
     {
         if (isDead) return;
@@ -246,7 +236,6 @@ public class PlayerController : MonoBehaviour
                 Image fillImg = playerHealthSlider.fillRect.GetComponent<Image>();
                 if (fillImg != null)
                 {
-                    // เปลี่ยนสีตามระดับเลือด: เขียว -> เหลือง -> แดง
                     fillImg.color = (ratio > 0.5f)
                         ? Color.Lerp(Color.yellow, new Color(0.2f, 0.85f, 0.4f), (ratio - 0.5f) * 2f)
                         : Color.Lerp(new Color(0.95f, 0.2f, 0.2f), Color.yellow, ratio * 2f);
@@ -265,7 +254,6 @@ public class PlayerController : MonoBehaviour
     {
         if (isDead) return;
         isDead = true;
-        Debug.Log("💀 Player Died!");
 
         StopMagnet();
 
@@ -274,11 +262,9 @@ public class PlayerController : MonoBehaviour
             SoundEffects.Instance.PlayPlayerDeath();
         }
 
-        // ปิด Collider เพื่อไม่ให้ชนซ้ำ
         Collider col = GetComponent<Collider>();
         if (col != null) col.enabled = false;
 
-        // สั่ง GameManager แสดงหน้าจอ Game Over
         if (GameManager.Instance == null)
         {
             GameObject gmObj = new GameObject("GameManager");
@@ -431,7 +417,6 @@ public class PlayerController : MonoBehaviour
             Vector3 origin = transform.position + Vector3.up * 0.5f;
             bool isBlocked = false;
 
-            // 🌟 เช็กการชนระหว่างแดช เพื่อไม่ให้พุ่งทะลุพินบอลหรือสิ่งกีดขวาง
             if (Physics.SphereCast(origin, playerRadius, dashDir, out RaycastHit hit, dashDistance + 0.1f))
             {
                 if (hit.collider.transform != transform &&
@@ -444,11 +429,9 @@ public class PlayerController : MonoBehaviour
             if (!isBlocked)
             {
                 transform.position += dashDir * dashDistance;
-                ClampPosition();
             }
             else
             {
-                // ถ้าพุ่งไปชนสิ่งกีดขวาง ให้หยุดแดชทันที
                 isDashing = false;
             }
         }
@@ -487,18 +470,8 @@ public class PlayerController : MonoBehaviour
             if (!isBlocked)
             {
                 transform.position += moveDir * moveDistance;
-                ClampPosition();
             }
         }
-    }
-
-    private void ClampPosition()
-    {
-        Vector3 clampedPos = transform.position;
-        clampedPos.x = Mathf.Clamp(clampedPos.x, -13.5f, 13.5f);
-        clampedPos.z = Mathf.Clamp(clampedPos.z, -13.5f, 13.5f);
-        clampedPos.y = 1f;
-        transform.position = clampedPos;
     }
 
     private void HandleAiming()
@@ -537,6 +510,16 @@ public class PlayerController : MonoBehaviour
 
     private void HandleMagnetSkill()
     {
+        // 🌟 [ระบบป้องกันบัค]: รีเซ็ตสถานะหากบอลเป้าหมายหายไปหรือถูกทำลายระหว่างดูด
+        if (isAttractingBall && targetMagnetBall == null)
+        {
+            isAttractingBall = false;
+        }
+        if (HasBallAttached && targetMagnetBall == null)
+        {
+            StopMagnet();
+        }
+
         bool isCooldownReady = Time.time >= lastMagnetTime + magnetCooldown;
 
         if (Input.GetKeyDown(KeyCode.E) && !HasBallAttached && !isAttractingBall && isCooldownReady)
