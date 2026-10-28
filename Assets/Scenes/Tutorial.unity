@@ -1422,7 +1422,7 @@ MonoBehaviour:
   m_fontSizeMax: 72
   m_fontStyle: 0
   m_HorizontalAlignment: 2
-  m_VerticalAlignment: 256
+  m_VerticalAlignment: 512
   m_textAlignment: 65535
   m_characterSpacing: 0
   m_characterHorizontalScale: 1
@@ -1840,7 +1840,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &657984933
 RectTransform:
   m_ObjectHideFlags: 0
@@ -2838,6 +2838,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SoundEffects
   masterVolume: 1
+  backgroundMusicClip: {fileID: 8300000, guid: a8e200f64fff49f4c8ae950949b52059, type: 3}
+  bgmVolume: 0.1
 --- !u!114 &995548435
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2856,6 +2858,8 @@ MonoBehaviour:
   enemyVolume: 1
   uiVolume: 1
   usePlayerPrefs: 0
+  backgroundMusicClip: {fileID: 0}
+  bgmVolume: 0.5
   playerHoverEngineClip: {fileID: 8300000, guid: 572ab343ce5ac7341baf22c586512808, type: 3}
   playerHoverVolume: 0.05
   playerDashClip: {fileID: 8300000, guid: 297392d87c54ddb439ea7b08f55d5711, type: 3}
@@ -2887,9 +2891,9 @@ MonoBehaviour:
   enemyHurtClip: {fileID: 0}
   enemyHurtVolume: 2
   enemyDieExplosionClip: {fileID: 8300000, guid: 2e8d9fe931965a943a11bb8d0c54da9f, type: 3}
-  enemyDieExplosionVolume: 0.5
+  enemyDieExplosionVolume: 0.34
   bumperHitClip: {fileID: 0}
-  bumperHitVolume: 0
+  bumperHitVolume: 0.11
   buttonClickClip: {fileID: 0}
   buttonClickVolume: 1
 --- !u!4 &995548436
@@ -4947,6 +4951,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SoundEffects
   masterVolume: 1
+  backgroundMusicClip: {fileID: 0}
+  bgmVolume: 0.5
 --- !u!4 &1856601098
 Transform:
   m_ObjectHideFlags: 0

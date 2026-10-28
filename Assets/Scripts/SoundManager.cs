@@ -42,6 +42,16 @@ public class SoundManager : MonoBehaviour
     [Tooltip("เปิด = บันทึกและดึงค่าเสียงจาก PlayerPrefs อัตโนมัติ")]
     public bool usePlayerPrefs = false;
 
+    [Header("=== เพลงพื้นหลัง (Background Music) ===")]
+    [Tooltip("ลากไฟล์เพลง (.mp3 / .wav / .ogg) มาใส่ช่องนี้ เพื่อให้เพลงเล่นวนซ้ำใน Scene นี้")]
+    public AudioClip backgroundMusicClip;
+
+    [Tooltip("ระดับเสียงเพลงพื้นหลัง")]
+    [Range(0f, 1f)]
+    public float bgmVolume = 0.5f;
+
+    private AudioSource bgmAudioSource;
+
     [Header("--- 1. เสียงฝั่งผู้เล่น (Player Drone) ---")]
     public AudioClip playerHoverEngineClip;
     [Range(0f, 2f)] public float playerHoverVolume = 0.5f;
@@ -150,6 +160,15 @@ public class SoundManager : MonoBehaviour
     {
         EnsureAudioListener();
         StartHoverEngine();
+        PlayBackgroundMusic();
+    }
+
+    private void OnDestroy()
+    {
+        if (_instance == this)
+        {
+            _instance = null;
+        }
     }
 
     private void Update()
@@ -165,6 +184,7 @@ public class SoundManager : MonoBehaviour
         playerVolume = Mathf.Clamp01(playerVolume);
         enemyVolume = Mathf.Clamp01(enemyVolume);
         uiVolume = Mathf.Clamp01(uiVolume);
+        bgmVolume = Mathf.Clamp01(bgmVolume);
 
         AudioListener.volume = masterVolume;
         UpdateHoverEngineVolume();
@@ -208,6 +228,12 @@ public class SoundManager : MonoBehaviour
         hoverEngineSource.playOnAwake = false;
         hoverEngineSource.loop = true;
         hoverEngineSource.spatialBlend = 0f;
+
+        bgmAudioSource = gameObject.AddComponent<AudioSource>();
+        bgmAudioSource.playOnAwake = false;
+        bgmAudioSource.loop = true;
+        bgmAudioSource.spatialBlend = 0f;
+        bgmAudioSource.volume = masterVolume * bgmVolume;
     }
 
     private void AutoFindExistingSoundAssets()
@@ -234,6 +260,8 @@ public class SoundManager : MonoBehaviour
     {
         masterVolume = Mathf.Clamp01(volume);
         AudioListener.volume = masterVolume;
+        if (bgmAudioSource != null)
+            bgmAudioSource.volume = masterVolume * bgmVolume;
         if (usePlayerPrefs) PlayerPrefs.SetFloat("Sound_MasterVolume", masterVolume);
         UpdateHoverEngineVolume();
     }
@@ -292,6 +320,33 @@ public class SoundManager : MonoBehaviour
         uiVolume = PlayerPrefs.GetFloat("Sound_UIVolume", uiVolume);
     }
     #endregion
+
+    public void PlayBackgroundMusic()
+    {
+        if (bgmAudioSource == null || backgroundMusicClip == null)
+            return;
+
+        bgmAudioSource.Stop();
+        bgmAudioSource.clip = backgroundMusicClip;
+        bgmAudioSource.loop = true;
+        bgmAudioSource.volume = masterVolume * bgmVolume;
+        bgmAudioSource.time = 0f;
+        bgmAudioSource.Play();
+    }
+
+    public void StopBackgroundMusic()
+    {
+        if (bgmAudioSource != null)
+            bgmAudioSource.Stop();
+    }
+
+    public void SetBGMVolume(float volume)
+    {
+        bgmVolume = Mathf.Clamp01(volume);
+
+        if (bgmAudioSource != null)
+            bgmAudioSource.volume = masterVolume * bgmVolume;
+    }
 
     #region Playback Functions
     public void StartHoverEngine()
