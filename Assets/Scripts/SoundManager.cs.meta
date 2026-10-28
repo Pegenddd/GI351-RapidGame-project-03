@@ -1,0 +1,29 @@
+fileFormatVersion: 2
+guid: 65ee3295390150045910b8ad59de9d00
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - playerHoverEngineClip: {fileID: 8300000, guid: 572ab343ce5ac7341baf22c586512808, type: 3}
+  - playerDashClip: {fileID: 8300000, guid: 297392d87c54ddb439ea7b08f55d5711, type: 3}
+  - playerHurtClip: {instanceID: 0}
+  - playerDeathClip: {instanceID: 0}
+  - batSwingClip: {fileID: 8300000, guid: 0b87ab4d4e6e9f149a7d0d8db07e8653, type: 3}
+  - batHitBallClip: {instanceID: 0}
+  - magnetSkillClip: {fileID: 8300000, guid: 223a509f9cbc2f54e83f4794ac59f572, type: 3}
+  - ballBounceClip: {instanceID: 0}
+  - ballHighSpeedBoostClip: {instanceID: 0}
+  - ballIceEffectClip: {instanceID: 0}
+  - ballExplodeEffectClip: {instanceID: 0}
+  - enemySpawnClip: {instanceID: 0}
+  - enemyMovementClip: {instanceID: 0}
+  - enemyTelegraphWarningClip: {instanceID: 0}
+  - enemyHurtClip: {instanceID: 0}
+  - enemyDieExplosionClip: {fileID: 8300000, guid: 2e8d9fe931965a943a11bb8d0c54da9f, type: 3}
+  - bumperHitClip: {instanceID: 0}
+  - buttonClickClip: {instanceID: 0}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

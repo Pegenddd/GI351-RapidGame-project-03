@@ -184,6 +184,13 @@ public static class HierarchyUISetupTool
             menuController = menuControllerObj.AddComponent<MainMenuController>();
         }
 
+        if (Object.FindAnyObjectByType<SoundManager>() == null)
+        {
+            GameObject sfxObj = new GameObject("SoundEffectsManager");
+            sfxObj.AddComponent<SoundManager>();
+            sfxObj.AddComponent<SoundEffects>();
+        }
+
         GameObject canvasObj = GameObject.Find("MainMenuCanvas");
         if (canvasObj == null)
         {
@@ -346,9 +353,10 @@ public static class HierarchyUISetupTool
             gm.mainMenuSceneName = "MainMenu";
         }
 
-        if (Object.FindAnyObjectByType<SoundEffects>() == null)
+        if (Object.FindAnyObjectByType<SoundManager>() == null && Object.FindAnyObjectByType<SoundEffects>() == null)
         {
             GameObject sfxObj = new GameObject("SoundEffectsManager");
+            sfxObj.AddComponent<SoundManager>();
             sfxObj.AddComponent<SoundEffects>();
         }
 

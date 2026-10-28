@@ -73,6 +73,11 @@ public class EnemySpawner : MonoBehaviour
         // 3. สร้างศัตรูพร้อมบวกความสูงตามค่าที่ตั้งไว้ใน Inspector
         Vector3 spawnPos = sp.position + (Vector3.up * spawnHeightOffset);
         Instantiate(selectedData.enemyPrefab, spawnPos, sp.rotation);
+
+        if (SoundManager.Instance != null)
+        {
+            SoundManager.Instance.PlayEnemySpawn(spawnPos);
+        }
     }
 
     private EnemySpawnData GetWeightedRandomEnemyData()

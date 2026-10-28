@@ -39,7 +39,7 @@ public class GameManager : MonoBehaviour
     public Canvas hudCanvas;
     public Text scoreText;
     public Text speedText;
-    public Text statusText; // 🌟 เพิ่ม Text UI สำหรับบอกสถานะ
+    public Text statusText;
     public GameObject controlsPanel;
     public GameObject gameOverPanel;
     public Text gameOverStatsText;
@@ -94,7 +94,6 @@ public class GameManager : MonoBehaviour
                 if (t != null) speedText = t.GetComponent<Text>();
             }
 
-            // 🌟 เช็คหา Status UI
             if (statusText == null)
             {
                 Transform t = hudCanvas.transform.Find("StatusText");
@@ -156,16 +155,7 @@ public class GameManager : MonoBehaviour
         {
             survivalTime += Time.deltaTime;
 
-            bool restartPressed = false;
-#if ENABLE_INPUT_SYSTEM
-            if (Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame) restartPressed = true;
-#endif
-            if (Input.GetKeyDown(KeyCode.R)) restartPressed = true;
-
-            if (restartPressed)
-            {
-                RestartGame();
-            }
+            // ❌ เอาการกดปุ่ม R ออกจากตรงนี้แล้ว
 
             if (activeBall == null)
             {
@@ -180,11 +170,10 @@ public class GameManager : MonoBehaviour
                     : new Color(0.3f, 0.9f, 1f);
             }
 
-            // 🌟 อัปเดต UI แสดงสถานะของลูกบอล (Buffs) ที่สามารถซ้อนทับกันได้
             if (statusText != null && activeBall != null)
             {
                 System.Collections.Generic.List<string> statuses = new System.Collections.Generic.List<string>();
-                
+
                 if (activeBall.hasIceEffect) statuses.Add("❄️ ICE");
                 if (activeBall.isExplosive) statuses.Add("🔥 EXPLODE");
                 if (activeBall.isOrbiting) statuses.Add("🌀 ORBIT");
@@ -203,20 +192,17 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            bool rPressed = false;
             bool mPressed = false;
 #if ENABLE_INPUT_SYSTEM
             if (Keyboard.current != null)
             {
-                if (Keyboard.current.rKey.wasPressedThisFrame) rPressed = true;
                 if (Keyboard.current.mKey.wasPressedThisFrame || Keyboard.current.escapeKey.wasPressedThisFrame) mPressed = true;
             }
 #endif
-            if (Input.GetKeyDown(KeyCode.R)) rPressed = true;
             if (Input.GetKeyDown(KeyCode.M) || Input.GetKeyDown(KeyCode.Escape)) mPressed = true;
 
-            if (rPressed) RestartGame();
-            else if (mPressed) GoToMainMenu();
+            // ❌ เอาการเช็กปุ่ม R ตอน Game Over ออกแล้ว ให้เหลือแค่กด M หรือ Escape กลับเมนูหลัก
+            if (mPressed) GoToMainMenu();
         }
     }
 
@@ -237,7 +223,7 @@ public class GameManager : MonoBehaviour
 
         if (scoreText != null)
         {
-            scoreText.text = $"🎯 ศัตรูที่กำจัด (Defeated): {enemiesDefeated}\n⭐ คะแนน (Score): {score}";
+            scoreText.text = $"Defeated: {enemiesDefeated}\nScore: {score}";
         }
     }
 
@@ -252,9 +238,9 @@ public class GameManager : MonoBehaviour
         int minutes = Mathf.FloorToInt(survivalTime / 60f);
         int seconds = Mathf.FloorToInt(survivalTime % 60f);
         string timeStr = $"{minutes:00}:{seconds:00}";
-        string stats = $"⏱️ เวลาที่รอด: {timeStr}\n" +
-                       $"🎯 ศัตรูที่กำจัด: {enemiesDefeated} ตัว\n" +
-                       $"⭐ คะแนนรวม: {score} แต้ม";
+        string stats = $" เวลาที่รอด: {timeStr}\n" +
+                       $" ศัตรูที่กำจัด: {enemiesDefeated} ตัว\n" +
+                       $" คะแนนรวม: {score} แต้ม";
 
         if (gameOverPanel != null)
         {
@@ -272,14 +258,12 @@ public class GameManager : MonoBehaviour
 
     public void RestartGame()
     {
-        if (SoundEffects.Instance != null) SoundEffects.Instance.PlayButtonClick();
         Time.timeScale = 1f;
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 
     public void GoToMainMenu()
     {
-        if (SoundEffects.Instance != null) SoundEffects.Instance.PlayButtonClick();
         Time.timeScale = 1f;
 
         if (!string.IsNullOrEmpty(mainMenuSceneName))
@@ -305,7 +289,6 @@ public class GameManager : MonoBehaviour
 
         Font defaultFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf") ?? Resources.GetBuiltinResource<Font>("Arial.ttf");
 
-        // Top Status Panel
         GameObject topPanelObj = new GameObject("TopPanel");
         topPanelObj.transform.SetParent(canvasObj.transform, false);
         Image topBg = topPanelObj.AddComponent<Image>();
@@ -317,7 +300,6 @@ public class GameManager : MonoBehaviour
         topRect.anchoredPosition = new Vector2(0, -15);
         topRect.sizeDelta = new Vector2(480, 85);
 
-        // Score Text
         GameObject scoreTextObj = new GameObject("ScoreText");
         scoreTextObj.transform.SetParent(topPanelObj.transform, false);
         scoreText = scoreTextObj.AddComponent<Text>();
@@ -325,13 +307,12 @@ public class GameManager : MonoBehaviour
         scoreText.fontSize = 20;
         scoreText.alignment = TextAnchor.MiddleCenter;
         scoreText.color = Color.white;
-        scoreText.text = $"🎯 ศัตรูที่กำจัด (Defeated): 0\n⭐ คะแนน (Score): 0";
+        scoreText.text = $"Defeated: 0\nScore: 0";
         RectTransform scoreRect = scoreTextObj.GetComponent<RectTransform>();
         scoreRect.anchorMin = Vector2.zero;
         scoreRect.anchorMax = Vector2.one;
         scoreRect.sizeDelta = Vector2.zero;
 
-        // Ball Speed Tag
         GameObject speedObj = new GameObject("SpeedText");
         speedObj.transform.SetParent(canvasObj.transform, false);
         speedText = speedObj.AddComponent<Text>();
@@ -348,7 +329,6 @@ public class GameManager : MonoBehaviour
         speedRect.anchoredPosition = new Vector2(-25, -20);
         speedRect.sizeDelta = new Vector2(300, 40);
 
-        // 🌟 Status Tag (สร้างข้อความบอกบัฟใต้บอกความเร็ว)
         GameObject statusObj = new GameObject("StatusText");
         statusObj.transform.SetParent(canvasObj.transform, false);
         statusText = statusObj.AddComponent<Text>();
@@ -362,10 +342,9 @@ public class GameManager : MonoBehaviour
         statusRect.anchorMin = new Vector2(1f, 1f);
         statusRect.anchorMax = new Vector2(1f, 1f);
         statusRect.pivot = new Vector2(1f, 1f);
-        statusRect.anchoredPosition = new Vector2(-25, -60); 
+        statusRect.anchoredPosition = new Vector2(-25, -60);
         statusRect.sizeDelta = new Vector2(400, 40);
 
-        // Bottom Left Controls Panel
         controlsPanel = new GameObject("ControlsPanel");
         controlsPanel.transform.SetParent(canvasObj.transform, false);
         Image controlsBg = controlsPanel.AddComponent<Image>();
@@ -375,7 +354,7 @@ public class GameManager : MonoBehaviour
         ctrlRect.anchorMax = new Vector2(0f, 0f);
         ctrlRect.pivot = new Vector2(0f, 0f);
         ctrlRect.anchoredPosition = new Vector2(20, 20);
-        ctrlRect.sizeDelta = new Vector2(420, 155);
+        ctrlRect.sizeDelta = new Vector2(420, 135); // ปรับขนาดกล่อง Controls Panel เล็กน้อยหลังเอาปุ่ม R ออก
 
         GameObject ctrlTextObj = new GameObject("ControlsText");
         ctrlTextObj.transform.SetParent(controlsPanel.transform, false);
@@ -387,8 +366,7 @@ public class GameManager : MonoBehaviour
         ctrlText.text = "🎮 [WASD] / ลูกศร: เดิน (Move)\n" +
                         "🏏 [คลิกซ้าย / Space]: หวดลูกบอล (Hit Ball)\n" +
                         "💨 [Shift ซ้าย / คลิกขวา]: แดชพุ่งหลบ (Dash)\n" +
-                        "🧲 [กด E]: สกิลดูดบอล + โหมดเล็งวิถีชิ่ง\n" +
-                        "🔄 [R]: รีสตาร์ทเกม (Restart)";
+                        "🧲 [กด E]: สกิลดูดบอล + โหมดเล็งวิถีชิ่ง"; // ❌ เอาบรรทัดปุ่ม R ออกจาก UI แนะนำการควบคุม
         RectTransform ctrlTextRect = ctrlTextObj.GetComponent<RectTransform>();
         ctrlTextRect.anchorMin = Vector2.zero;
         ctrlTextRect.anchorMax = Vector2.one;
@@ -479,7 +457,7 @@ public class GameManager : MonoBehaviour
         statsRect.anchorMax = new Vector2(0.9f, 0.72f);
         statsRect.sizeDelta = Vector2.zero;
 
-        restartButton = CreateButton(cardObj.transform, "RestartBtn", "🔄 เล่นอีกครั้ง [R]", new Vector2(0, -115), new Color(0.18f, 0.65f, 0.35f), defaultFont, RestartGame);
+        restartButton = CreateButton(cardObj.transform, "RestartBtn", "🔄 เล่นอีกครั้ง", new Vector2(0, -115), new Color(0.18f, 0.65f, 0.35f), defaultFont, RestartGame); // เอาปุ่ม [R] ออกจากข้อความปุ่ม
         mainMenuButton = CreateButton(cardObj.transform, "MainMenuBtn", "🏠 เมนูหลัก [M]", new Vector2(0, -180), new Color(0.25f, 0.45f, 0.75f), defaultFont, GoToMainMenu);
     }
 

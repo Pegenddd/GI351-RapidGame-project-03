@@ -1,22 +1,18 @@
 using UnityEngine;
 
 /// <summary>
-/// Generates procedural sound effects so the game has rich audio without needing external assets.
+/// SoundEffects - คอมโพเนนต์ความเข้ากันได้ย้อนหลัง (Compatibility Wrapper)
+/// ส่งต่อคำสั่งเสียงทั้งหมดไปยัง SoundManager.Instance โดยตรง
+/// เพื่อให้โค้ดเดิมหรือเครื่องมือเดิมใน Hierarchy/Editor ทำงานต่อได้ 100% โดยไม่ติดขัด
+/// สามารถปรับความดัง Master Volume ใน Inspector ได้เช่นกัน
 /// </summary>
 public class SoundEffects : MonoBehaviour
 {
     public static SoundEffects Instance { get; private set; }
 
-    private AudioSource audioSource;
-
-    private AudioClip swingClip;
-    private AudioClip hitBallClip;
-    private AudioClip bounceClip;
-    private AudioClip enemyHurtClip;
-    private AudioClip enemyDieClip;
-    private AudioClip playerHurtClip;
-    private AudioClip playerDieClip;
-    private AudioClip buttonClickClip;
+    [Header("Master Volume (ปรับความดังรวมที่นี่ 0 ถึง 1)")]
+    [Range(0f, 1f), Tooltip("ปรับความดังรวมทั้งหมด มีผลทันทีแบบ Real-time")]
+    public float masterVolume = 1.0f;
 
     private void Awake()
     {
@@ -27,140 +23,44 @@ public class SoundEffects : MonoBehaviour
         }
         Instance = this;
 
-        audioSource = gameObject.AddComponent<AudioSource>();
-        audioSource.playOnAwake = false;
-
-        GenerateClips();
-    }
-
-    private void GenerateClips()
-    {
-        swingClip = CreateWhooshClip("SwingWhoosh", 0.15f, 400f, 150f);
-        hitBallClip = CreateImpactClip("HitBall", 0.2f, 650f, 180f);
-        bounceClip = CreateToneClip("BouncePing", 0.12f, 520f, 680f);
-        enemyHurtClip = CreateSquishClip("EnemyHurt", 0.18f, 320f, 90f);
-        enemyDieClip = CreateExplosionClip("EnemyDie", 0.35f, 220f, 40f);
-        playerHurtClip = CreateSquishClip("PlayerHurt", 0.22f, 260f, 110f);
-        playerDieClip = CreateExplosionClip("PlayerDie", 0.65f, 180f, 35f);
-        buttonClickClip = CreateToneClip("ButtonClick", 0.08f, 750f, 950f);
-    }
-
-    public void PlaySwing() => Play(swingClip, 0.7f, Random.Range(0.95f, 1.05f));
-    public void PlayHitBall() => Play(hitBallClip, 1.0f, Random.Range(0.95f, 1.15f));
-    public void PlayBounce() => Play(bounceClip, 0.6f, Random.Range(0.9f, 1.1f));
-    public void PlayEnemyHurt() => Play(enemyHurtClip, 0.9f, Random.Range(0.9f, 1.2f));
-    public void PlayEnemyDie() => Play(enemyDieClip, 1.0f, Random.Range(0.85f, 1.05f));
-    public void PlayPlayerHurt() => Play(playerHurtClip, 0.95f, Random.Range(0.9f, 1.1f));
-    public void PlayPlayerDeath() => Play(playerDieClip, 1.0f, 0.85f);
-    public void PlayButtonClick() => Play(buttonClickClip, 0.8f, 1.0f);
-
-    private void Play(AudioClip clip, float volume, float pitch)
-    {
-        if (clip == null || audioSource == null) return;
-        audioSource.pitch = pitch;
-        audioSource.PlayOneShot(clip, volume);
-    }
-
-    private AudioClip CreateWhooshClip(string name, float duration, float startFreq, float endFreq)
-    {
-        int sampleRate = 44100;
-        int sampleCount = Mathf.CeilToInt(duration * sampleRate);
-        float[] samples = new float[sampleCount];
-
-        for (int i = 0; i < sampleCount; i++)
+        // ตรวจสอบว่ามี SoundManager หรือยัง ถ้ายังไม่มีให้สร้างขึ้นมา
+        if (SoundManager.Instance == null)
         {
-            float t = (float)i / sampleCount;
-            float freq = Mathf.Lerp(startFreq, endFreq, t);
-            float env = Mathf.Sin(t * Mathf.PI);
-            float noise = (Random.value * 2f - 1f) * 0.4f;
-            float sine = Mathf.Sin(2f * Mathf.PI * freq * (i / (float)sampleRate)) * 0.6f;
-            samples[i] = (sine + noise) * env;
+            if (GetComponent<SoundManager>() == null)
+            {
+                gameObject.AddComponent<SoundManager>();
+            }
         }
 
-        AudioClip clip = AudioClip.Create(name, sampleCount, 1, sampleRate, false);
-        clip.SetData(samples, 0);
-        return clip;
-    }
-
-    private AudioClip CreateImpactClip(string name, float duration, float startFreq, float endFreq)
-    {
-        int sampleRate = 44100;
-        int sampleCount = Mathf.CeilToInt(duration * sampleRate);
-        float[] samples = new float[sampleCount];
-
-        for (int i = 0; i < sampleCount; i++)
+        if (SoundManager.Instance != null)
         {
-            float t = (float)i / sampleCount;
-            float freq = Mathf.Lerp(startFreq, endFreq, t * t);
-            float env = Mathf.Exp(-t * 12f);
-            float sine = Mathf.Sin(2f * Mathf.PI * freq * (i / (float)sampleRate));
-            float noise = (Random.value * 2f - 1f) * 0.3f * Mathf.Exp(-t * 20f);
-            samples[i] = (sine + noise) * env;
+            masterVolume = SoundManager.Instance.masterVolume;
         }
-
-        AudioClip clip = AudioClip.Create(name, sampleCount, 1, sampleRate, false);
-        clip.SetData(samples, 0);
-        return clip;
     }
 
-    private AudioClip CreateToneClip(string name, float duration, float startFreq, float endFreq)
+    private void OnValidate()
     {
-        int sampleRate = 44100;
-        int sampleCount = Mathf.CeilToInt(duration * sampleRate);
-        float[] samples = new float[sampleCount];
-
-        for (int i = 0; i < sampleCount; i++)
+        if (SoundManager.Instance != null)
         {
-            float t = (float)i / sampleCount;
-            float freq = Mathf.Lerp(startFreq, endFreq, t);
-            float env = Mathf.Exp(-t * 14f);
-            samples[i] = Mathf.Sin(2f * Mathf.PI * freq * (i / (float)sampleRate)) * env;
+            SoundManager.Instance.masterVolume = masterVolume;
+            SoundManager.Instance.UpdateHoverEngineVolume();
         }
-
-        AudioClip clip = AudioClip.Create(name, sampleCount, 1, sampleRate, false);
-        clip.SetData(samples, 0);
-        return clip;
     }
 
-    private AudioClip CreateSquishClip(string name, float duration, float startFreq, float endFreq)
+    public void SetMasterVolume(float volume)
     {
-        int sampleRate = 44100;
-        int sampleCount = Mathf.CeilToInt(duration * sampleRate);
-        float[] samples = new float[sampleCount];
-
-        for (int i = 0; i < sampleCount; i++)
-        {
-            float t = (float)i / sampleCount;
-            float freq = Mathf.Lerp(startFreq, endFreq, t);
-            float env = Mathf.Exp(-t * 10f);
-            float squishNoise = (Random.value * 2f - 1f) * 0.6f;
-            float tone = Mathf.Sin(2f * Mathf.PI * freq * (i / (float)sampleRate)) * 0.4f;
-            samples[i] = (squishNoise + tone) * env;
-        }
-
-        AudioClip clip = AudioClip.Create(name, sampleCount, 1, sampleRate, false);
-        clip.SetData(samples, 0);
-        return clip;
+        masterVolume = Mathf.Clamp01(volume);
+        SoundManager.Instance?.SetMasterVolume(masterVolume);
     }
 
-    private AudioClip CreateExplosionClip(string name, float duration, float startFreq, float endFreq)
-    {
-        int sampleRate = 44100;
-        int sampleCount = Mathf.CeilToInt(duration * sampleRate);
-        float[] samples = new float[sampleCount];
-
-        for (int i = 0; i < sampleCount; i++)
-        {
-            float t = (float)i / sampleCount;
-            float freq = Mathf.Lerp(startFreq, endFreq, t);
-            float env = Mathf.Exp(-t * 6f);
-            float noise = (Random.value * 2f - 1f) * 0.8f;
-            float sub = Mathf.Sin(2f * Mathf.PI * freq * (i / (float)sampleRate)) * 0.5f;
-            samples[i] = (noise + sub) * env;
-        }
-
-        AudioClip clip = AudioClip.Create(name, sampleCount, 1, sampleRate, false);
-        clip.SetData(samples, 0);
-        return clip;
-    }
+    public void PlaySwing() => SoundManager.Instance?.PlaySwing();
+    public void PlayHitBall(Vector3? pos = null) => SoundManager.Instance?.PlayHitBall(pos);
+    public void PlayBounce(Vector3? pos = null) => SoundManager.Instance?.PlayBounce(pos);
+    public void PlayEnemyHurt(Vector3? pos = null) => SoundManager.Instance?.PlayEnemyHurt(pos);
+    public void PlayEnemyDie(Vector3? pos = null) => SoundManager.Instance?.PlayEnemyDie(pos);
+    public void PlayPlayerHurt() => SoundManager.Instance?.PlayPlayerHurt();
+    public void PlayPlayerDeath() => SoundManager.Instance?.PlayPlayerDeath();
+    public void PlayButtonClick() => SoundManager.Instance?.PlayButtonClick();
+    public void PlayDash() => SoundManager.Instance?.PlayDash();
+    public void PlayMagnetSkill() => SoundManager.Instance?.PlayMagnetSkill();
 }

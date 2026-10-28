@@ -59,6 +59,20 @@ public class MainMenuController : MonoBehaviour
         Cursor.visible = true;
         Time.timeScale = 1f;
 
+        // 🌟 สั่งหยุดเสียง AudioSource ทั้งหมดที่อาจเล่นค้างอยู่ใน Scene ทันที
+        AudioSource[] allAudioSources = FindObjectsByType<AudioSource>(FindObjectsSortMode.None);
+        foreach (AudioSource audio in allAudioSources)
+        {
+            audio.Stop();
+        }
+
+        if (SoundManager.Instance == null && FindAnyObjectByType<SoundManager>() == null)
+        {
+            GameObject soundObj = new GameObject("SoundEffectsManager");
+            soundObj.AddComponent<SoundManager>();
+            soundObj.AddComponent<SoundEffects>();
+        }
+
         EnsureEventSystem();
         BindHierarchyUI();
     }
@@ -134,7 +148,8 @@ public class MainMenuController : MonoBehaviour
 
     public void PlayGame()
     {
-        if (SoundEffects.Instance != null) SoundEffects.Instance.PlayButtonClick();
+        if (SoundManager.Instance != null) SoundManager.Instance.PlayButtonClick();
+        else if (SoundEffects.Instance != null) SoundEffects.Instance.PlayButtonClick();
 
         Time.timeScale = 1f;
         if (!string.IsNullOrEmpty(gameSceneName))
@@ -157,7 +172,9 @@ public class MainMenuController : MonoBehaviour
 
     public void OpenHowToPlay()
     {
-        if (SoundEffects.Instance != null) SoundEffects.Instance.PlayButtonClick();
+        if (SoundManager.Instance != null) SoundManager.Instance.PlayButtonClick();
+        else if (SoundEffects.Instance != null) SoundEffects.Instance.PlayButtonClick();
+
         if (howToPlayPanel != null)
         {
             howToPlayPanel.SetActive(true);
@@ -166,7 +183,9 @@ public class MainMenuController : MonoBehaviour
 
     public void CloseHowToPlay()
     {
-        if (SoundEffects.Instance != null) SoundEffects.Instance.PlayButtonClick();
+        if (SoundManager.Instance != null) SoundManager.Instance.PlayButtonClick();
+        else if (SoundEffects.Instance != null) SoundEffects.Instance.PlayButtonClick();
+
         if (howToPlayPanel != null)
         {
             howToPlayPanel.SetActive(false);
@@ -175,7 +194,9 @@ public class MainMenuController : MonoBehaviour
 
     public void QuitGame()
     {
-        if (SoundEffects.Instance != null) SoundEffects.Instance.PlayButtonClick();
+        if (SoundManager.Instance != null) SoundManager.Instance.PlayButtonClick();
+        else if (SoundEffects.Instance != null) SoundEffects.Instance.PlayButtonClick();
+
         Debug.Log("Quitting Application...");
 #if UNITY_EDITOR
         UnityEditor.EditorApplication.isPlaying = false;
@@ -304,10 +325,9 @@ public class MainMenuController : MonoBehaviour
         detailsText.text = "🕹️  [W, A, S, D] หรือ [ลูกศร] : เคลื่อนที่ตัวละคร (Move)\n" +
                            "🏏  [คลิกซ้าย] หรือ [Spacebar] : หวดลูกบอลเพื่อเร่งความเร็วและชิ่งศัตรู\n" +
                            "💨  [Shift ซ้าย] หรือ [คลิกขวา] : พุ่งแดชหลบการโจมตี (Dash)\n" +
-                           "🧲  [กด E] : สกิลแม่เหล็กดึงลูกบอล + เล็งวิถีชิ่งสะท้อนล่วงหน้า\n" +
-                           "🔄  [R] : รีสตาร์ทเกมอย่างรวดเร็ว (Quick Restart)\n\n" +
+                           "🧲  [กด E] : สกิลแม่เหล็กดึงลูกบอล + เล็งวิถีชิ่งสะท้อนล่วงหน้า\n\n" +
                            "💡  เป้าหมาย: ตีลูกบอลให้ชิ่งโดนศัตรูเพื่อทำดาเมจ ระวังศัตรูวิ่งเข้าประชิด!\n" +
-                           "     รักษาหลอดเลือดของคุณให้นานที่สุดเพื่อทำสถิติคลิกคะแนนสูงสุด!";
+                           "    รักษาหลอดเลือดของคุณให้นานที่สุดเพื่อทำสถิติคะแนนสูงสุด!";
         RectTransform detailsRect = detailsObj.GetComponent<RectTransform>();
         detailsRect.anchorMin = new Vector2(0f, 0f);
         detailsRect.anchorMax = new Vector2(1f, 1f);

@@ -425,10 +425,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9c88cfde2b1ad1b48a393e05587e4719, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemySpawner
-  maxEnemies: 1
-  spawnInterval: 2.5
-  arenaHalfSize: 12
-  minDistanceFromPlayer: 5
+  enemyPrefabs: []
+  spawnPoints: []
+  spawnHeightOffset: 1.5
+  maxEnemiesInScene: 25
+  baseSpawnInterval: 1.5
+  difficultyMultiplierPerMinute: 0.15
 --- !u!4 &353348505
 Transform:
   m_ObjectHideFlags: 0
@@ -475,7 +477,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GameManager
   enemiesDefeated: 0
   score: 0
-  showHUD: 1
+  survivalTime: 0
+  targetMainMenuSceneAsset: {fileID: 0}
+  mainMenuSceneName: MainMenu
+  hudCanvas: {fileID: 0}
+  scoreText: {fileID: 0}
+  speedText: {fileID: 0}
+  statusText: {fileID: 0}
+  controlsPanel: {fileID: 0}
+  gameOverPanel: {fileID: 0}
+  gameOverStatsText: {fileID: 0}
+  restartButton: {fileID: 0}
+  mainMenuButton: {fileID: 0}
 --- !u!4 &596314878
 Transform:
   m_ObjectHideFlags: 0
@@ -1531,9 +1544,12 @@ MonoBehaviour:
   maxPlayerHealth: 100
   currentPlayerHealth: 0
   playerHealthSlider: {fileID: 2119735106}
+  playerHpText: {fileID: 0}
   dashSpeed: 25
   dashDuration: 0.15
   dashCooldown: 1
+  enableDashLightning: 1
+  dashLightningColor: {r: 0.2, g: 0.8, b: 1, a: 1}
   magnetPullSpeed: 35
   maxMagnetDistance: 10
   magnetCooldown: 3
@@ -1546,8 +1562,18 @@ MonoBehaviour:
   hitAngle: 140
   swingCooldown: 0.28
   hitForce: 32
+  showHitConeVisual: 1
+  hitConeColor: {r: 1, g: 0.5, b: 0, a: 0.6}
   batTransform: {fileID: 1303350658}
   modelTransform: {fileID: 0}
+  hoverEngineSound: {fileID: 0}
+  dashSound: {fileID: 0}
+  playerHurtSound: {fileID: 0}
+  playerDeathSound: {fileID: 0}
+  swingSound: {fileID: 0}
+  hitBallSound: {fileID: 0}
+  magnetSkillSound: {fileID: 0}
+  playerAudioVolume: 1
 --- !u!23 &1757672879
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -1674,6 +1700,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bfd202d44d6e53d4996abb81e1291778, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SoundEffects
+  masterVolume: 1
 --- !u!4 &1856601098
 Transform:
   m_ObjectHideFlags: 0
@@ -2075,6 +2102,11 @@ MonoBehaviour:
   normalColor: {r: 0.2, g: 0.8, b: 1, a: 1}
   boostedColor: {r: 1, g: 0.5, b: 0.1, a: 1}
   explosiveColor: {r: 1, g: 0.1, b: 0.1, a: 1}
+  iceColor: {r: 0.4, g: 0.8, b: 1, a: 1}
+  isExplosive: 0
+  hasIceEffect: 0
+  isOrbiting: 0
+  orbitTargetTransform: {fileID: 0}
 --- !u!23 &2078252587
 MeshRenderer:
   m_ObjectHideFlags: 0

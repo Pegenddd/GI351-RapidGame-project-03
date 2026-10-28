@@ -2,10 +2,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// Base class for enemies placed directly in the scene.
-/// Handles chasing the player, attacking with a telegraph area, death explosion, and slow/pull states.
-/// </summary>
 public class EnemyBase : MonoBehaviour
 {
     [Header("Health Settings")]
@@ -13,45 +9,74 @@ public class EnemyBase : MonoBehaviour
     public float currentHealth;
 
     [Header("Movement & Combat Settings")]
-    public float moveSpeed = 4f;                  // ความเร็วในการวิ่งไล่ตามผู้เล่น
-    public float attackRange = 2.0f;              // ระยะประชิดที่ศัตรูจะเริ่มหยุดเพื่อร่ายสกิลโจมตีพื้น
-    public float attackCooldown = 3.0f;           // คูลดาวน์ระหว่างการโจมตีแต่ละครั้ง
-    public float attackDamage = 15f;              // ดาเมจที่ทำใส่ผู้เล่น
+    public float moveSpeed = 4f;
+    public float attackRange = 2.0f;
+    public float attackCooldown = 3.0f;
+    public float attackDamage = 15f;
+    [Tooltip("เวลาหยุดยืนนิ่งหลังตีเสร็จ (วงโจมตีหาย) ก่อนจะเริ่มเดินตามต่อ")]
+    public float attackRecoveryDelay = 0.5f;
+
+    [Header("Enemy Spacing / Separation Settings")]
+    [Tooltip("ระยะห่างที่ศัตรูพยายามรักษาระหว่างกันเพื่อไม่ให้กองรวมกัน")]
+    public float separationRadius = 1.5f;
+    [Tooltip("ความแรงในการผลักกันออกเมื่อเข้าใกล้กันเกินไป")]
+    public float separationWeight = 1.2f;
+
+    [Header("Telegraph Attack Settings")]
+    [Tooltip("เวลานับถอยหลังก่อนที่ช่องโจมตีจะระเบิด")]
+    public float telegraphDuration = 0.8f;
+    [Tooltip("ขนาดพื้นที่สี่เหลี่ยมสีแดงที่เตือนบนพื้น")]
+    public float telegraphBoxSize = 3.5f;
 
     private float lastAttackTime = -999f;
     private bool isAttacking = false;
-    private GameObject currentTelegraphIndicator; // 🌟 ตัวแปรเก็บอ้างอิงกล่องเตือนบนพื้น
+    private GameObject currentTelegraphIndicator;
 
-    [Header("Death Explosion Settings")]
-    [Tooltip("เปิดใช้งานระเบิดตัวเองเมื่อตายเพื่อทำดาเมจใส่ศัตรูรอบข้าง")]
+    [Header("Death Settings & Timing")]
+    [Tooltip("เปิดใช้งานระเบิดตัวเองเมื่อตาย")]
     public bool enableDeathExplosion = true;
-    public float deathExplosionRadius = 4.0f;     // รัศมีแรงระเบิดตอนตาย
-    public float deathExplosionDamage = 50f;      // ดาเมจระเบิดตอนตาย
+    public float deathExplosionRadius = 4.0f;
+    public float deathExplosionDamage = 50f;
+    [Tooltip("เวลากี่วินาทีก่อนที่ศัตรูจะระเบิดหลังตาย")]
+    public float deathDelay = 1.0f;
+    [Tooltip("สีของหุ่นตอนตายก่อนระเบิด")]
+    public Color preDeathColor = Color.black;
+    [Tooltip("ความแรงในการสั่นตอนใกล้ระเบิด")]
+    public float shakeMagnitude = 0.08f;
+    public GameObject deathExplosionPrefab;
+
+    [Header("Death Audio Settings")]
+    public AudioClip customExplosionSound;
+    public float explosionVolume = 1.5f;
 
     [Header("Visual Feedback (Flash)")]
-    public Color flashColor = Color.white;        // สีตอนโดนตี (สีกระพริบ)
-    public float flashDuration = 0.1f;            // ระยะเวลาที่กระพริบ
+    public Color flashColor = Color.white;
+    public float flashDuration = 0.1f;
 
     private Renderer meshRenderer;
     private MaterialPropertyBlock propBlock;
     private Transform playerTransform;
     private bool isDead = false;
 
-    // ตัวแปรสำหรับเก็บค่าสโลว์ของศัตรู
     private float originalMoveSpeed = -1f;
     private float slowTimer = 0f;
     private bool isSlowed = false;
 
-    // ตัวแปรเช็กสถานะกำลังโดนแรงดึงดูดของเสาพินบอล
     private bool isBeingPulled = false;
 
-    // Overhead Health UI
     [Header("UI Settings")]
     [Tooltip("แสดงหลอดเลือดบนหัวศัตรู")]
     public bool showHealthBar = true;
 
     private Slider healthSlider;
     private GameObject healthCanvasObj;
+
+    [Header("Drone Tilt Animation Settings")]
+    [Tooltip("ความแรงในการเอียงซ้ายขวาขณะเคลื่อนที่")]
+    public float maxTiltAngle = 12f;
+    private float tiltFrequencyX;
+    private float tiltFrequencyZ;
+    private float tiltRandomSeed;
 
     private void Awake()
     {
@@ -64,6 +89,10 @@ public class EnemyBase : MonoBehaviour
         {
             CreateOverheadHealthBar();
         }
+
+        tiltRandomSeed = Random.Range(0f, 100f);
+        tiltFrequencyX = Random.Range(3.5f, 6.5f);
+        tiltFrequencyZ = Random.Range(2.5f, 5.0f);
     }
 
     private void Start()
@@ -79,34 +108,62 @@ public class EnemyBase : MonoBehaviour
     {
         if (isDead) return;
 
-        // เรียกใช้งานระบบจับเวลาสโลว์ในทุกๆ เฟรม
         HandleSlowTimer();
-
         UpdateMovementAndCombat();
         UpdateHealthBarTransform();
+        HandleDroneTiltAnimation();
     }
 
     private void UpdateMovementAndCombat()
     {
-        // ถ้ากำลังโดนแรงดึงดูดของเสา หรือกำลังร่ายสกิลโจมตีอยู่ จะไม่ให้เดินเองปกติ
         if (isBeingPulled || isAttacking) return;
-
         if (playerTransform == null) return;
 
-        // คำนวณระยะห่างระหว่างศัตรูกับผู้เล่น
         Vector3 toPlayer = playerTransform.position - transform.position;
         toPlayer.y = 0;
         float distToPlayer = toPlayer.magnitude;
 
-        // เช็คว่าอยู่ในระยะโจมตีและพ้นคูลดาวน์หรือยัง
+        if (distToPlayer <= attackRange * 1.5f)
+        {
+            Quaternion lookRot = Quaternion.LookRotation(toPlayer.normalized, Vector3.up);
+            transform.rotation = Quaternion.Slerp(transform.rotation, lookRot, 12f * Time.deltaTime);
+        }
+
         if (distToPlayer <= attackRange && Time.time >= lastAttackTime + attackCooldown)
         {
             StartCoroutine(PerformTelegraphAttack());
         }
         else if (distToPlayer > attackRange)
         {
-            // 🌟 วิ่งไล่ตามผู้เล่นอย่างต่อเนื่องเมื่ออยู่นอกระยะโจมตี
+            // 🌟 คำนวณทิศทางเดินเข้าหาผู้เล่น
             Vector3 moveDir = toPlayer.normalized;
+
+            // 🌟 เพิ่มระบบ Separation (ตรวจจับและดันออกหากศัตรูตัวอื่นยืนใกล้เกินไป เพื่อไม่ให้กองรวมกัน)
+            Vector3 separationForce = Vector3.zero;
+            Collider[] nearbyColliders = Physics.OverlapSphere(transform.position, separationRadius);
+            int neighborCount = 0;
+
+            foreach (var col in nearbyColliders)
+            {
+                if (col.gameObject != gameObject && (col.CompareTag("Enemy") || col.GetComponent<EnemyBase>() != null))
+                {
+                    Vector3 pushDir = transform.position - col.transform.position;
+                    pushDir.y = 0;
+                    float d = pushDir.magnitude;
+                    if (d > 0f && d < separationRadius)
+                    {
+                        // ยิ่งใกล้ยิ่งผลักแรง
+                        separationForce += pushDir.normalized / d;
+                        neighborCount++;
+                    }
+                }
+            }
+
+            if (neighborCount > 0)
+            {
+                // ผสมทิศทางเดินเข้าหาผู้เล่น เข้ากับแรงผลักออกจากเพื่อนร่วมทีม
+                moveDir = (moveDir + separationForce * separationWeight).normalized;
+            }
 
             float raycastDist = moveSpeed * Time.deltaTime + 0.3f;
             if (!Physics.Raycast(transform.position + Vector3.up * 0.5f, moveDir, raycastDist))
@@ -114,58 +171,70 @@ public class EnemyBase : MonoBehaviour
                 transform.position += moveDir * moveSpeed * Time.deltaTime;
             }
 
-            // หันหน้าเข้าหาผู้เล่น
             Quaternion targetRot = Quaternion.LookRotation(moveDir, Vector3.up);
             transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, 12f * Time.deltaTime);
         }
     }
 
-    /// <summary>
-    /// ระบบโจมตีแบบแสดงพื้นที่เตือนสีแดง (Telegraph) ให้ผู้เล่นหลบ
-    /// </summary>
+    private void HandleDroneTiltAnimation()
+    {
+        float time = Time.time + tiltRandomSeed;
+
+        float tiltFactor = isAttacking ? 0.3f : 1.0f;
+        float tiltZ = Mathf.Sin(time * tiltFrequencyX) * (maxTiltAngle * tiltFactor);
+        float tiltX = Mathf.Cos(time * tiltFrequencyZ) * (maxTiltAngle * 0.5f * tiltFactor);
+
+        Transform modelTrans = transform;
+        if (transform.childCount > 0)
+        {
+            Transform firstChild = transform.GetChild(0);
+            if (firstChild.gameObject != healthCanvasObj && !firstChild.name.Contains("Canvas"))
+            {
+                modelTrans = firstChild;
+            }
+        }
+
+        modelTrans.localRotation = Quaternion.Euler(tiltX, 0f, -tiltZ);
+    }
+
     private System.Collections.IEnumerator PerformTelegraphAttack()
     {
         isAttacking = true;
         lastAttackTime = Time.time;
 
-        // จุดศูนย์กลางพื้นที่โจมตี (ตำแหน่งผู้เล่นขณะเริ่มร่าย)
         Vector3 targetPos = playerTransform != null ? playerTransform.position : transform.position + transform.forward * 3f;
-        targetPos.y = 0.05f; // ให้ลอยเหนือพื้นเล็กน้อยกัน Z-fighting
+        targetPos.y = 0.05f;
 
-        float telegraphDuration = 1.2f; // เวลารอให้ผู้เล่นหลบ (วินาที)
-        float boxSize = 3.5f;           // ขนาดพื้นที่สี่เหลี่ยม
-
-        // สร้างสี่เหลี่ยมสีแดงเตือนบนพื้น (Telegraph Box)
         currentTelegraphIndicator = GameObject.CreatePrimitive(PrimitiveType.Cube);
         currentTelegraphIndicator.name = "AttackTelegraphBox";
         currentTelegraphIndicator.transform.position = targetPos;
-        currentTelegraphIndicator.transform.localScale = new Vector3(boxSize, 0.02f, boxSize);
+        currentTelegraphIndicator.transform.localScale = new Vector3(telegraphBoxSize, 0.02f, telegraphBoxSize);
 
-        // ปิด Collider ของตัวกล่องเตือนไม่ให้เกะกะการชน
         Collider col = currentTelegraphIndicator.GetComponent<Collider>();
         if (col != null) Destroy(col);
 
-        // ตั้งค่า Material ให้เป็นสีแดงกึ่งโปร่งใส
         Renderer indRenderer = currentTelegraphIndicator.GetComponent<Renderer>();
         Material indMat = new Material(Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default"));
         indMat.color = new Color(1f, 0f, 0f, 0.35f);
         indRenderer.material = indMat;
 
+        if (SoundManager.Instance != null)
+        {
+            SoundManager.Instance.PlayTelegraphWarning(targetPos);
+        }
+
         float elapsed = 0f;
         while (elapsed < telegraphDuration)
         {
-            // ถ้าศัตรูตายกลางคัน ให้หยุดร่ายทันที
             if (isDead) yield break;
 
             elapsed += Time.deltaTime;
-            // ทำให้สีแดงกระพริบเตือนความถี่สูงขึ้นเรื่อยๆ ก่อนระเบิด
-            float alpha = Mathf.Lerp(0.2f, 0.7f, Mathf.PingPong(elapsed * 6f, 1f));
+            float alpha = Mathf.Lerp(0.2f, 0.8f, Mathf.PingPong(elapsed * 10f, 1f));
             indMat.color = new Color(1f, 0f, 0f, alpha);
             yield return null;
         }
 
-        // --- ทำงานเมื่อครบเวลาเตือน (สร้างความเสียหายในพื้นที่) ---
-        Collider[] hits = Physics.OverlapBox(targetPos, new Vector3(boxSize * 0.5f, 2f, boxSize * 0.5f), Quaternion.identity);
+        Collider[] hits = Physics.OverlapBox(targetPos, new Vector3(telegraphBoxSize * 0.5f, 2f, telegraphBoxSize * 0.5f), Quaternion.identity);
         foreach (var hit in hits)
         {
             if (hit.CompareTag("Player") || hit.GetComponent<PlayerController>() != null)
@@ -178,21 +247,17 @@ public class EnemyBase : MonoBehaviour
             }
         }
 
-        // ลบกล่องเตือนบนพื้นทิ้ง
         if (currentTelegraphIndicator != null)
         {
             Destroy(currentTelegraphIndicator);
             currentTelegraphIndicator = null;
         }
 
-        // หน่วงเวลาหลังโจมตีเสร็จเล็กน้อยก่อนกลับมาเดินไล่ล่าต่อ
-        yield return new WaitForSeconds(0.5f);
+        yield return new WaitForSeconds(attackRecoveryDelay);
+
         isAttacking = false;
     }
 
-    /// <summary>
-    /// เรียกใช้งานเมื่อลูกบอลวิ่งมาชนหรือทะลุผ่านศัตรู
-    /// </summary>
     public void TakeDamage(float damageAmount, Vector3 hitPoint, Vector3 hitDirection)
     {
         if (isDead) return;
@@ -208,20 +273,20 @@ public class EnemyBase : MonoBehaviour
         SpawnDamageNumber(damageAmount, hitPoint);
         TriggerFlashEffect();
 
-        if (SoundEffects.Instance != null)
+        if (SoundManager.Instance != null)
         {
-            SoundEffects.Instance.PlayEnemyHurt();
+            SoundManager.Instance.PlayEnemyHurt(hitPoint);
         }
 
         if (currentHealth <= 0f)
         {
-            Die();
+            StartCoroutine(DieSequence());
         }
     }
 
     private void TriggerFlashEffect()
     {
-        if (meshRenderer != null)
+        if (meshRenderer != null && !isDead)
         {
             CancelInvoke(nameof(ResetFlash));
             SetRendererColor(flashColor);
@@ -297,19 +362,51 @@ public class EnemyBase : MonoBehaviour
         anim.Init(tm);
     }
 
-    private void Die()
+    private System.Collections.IEnumerator DieSequence()
     {
-        if (isDead) return;
+        if (isDead) yield break;
         isDead = true;
 
-        // 🌟 เคลียร์กล่องเตือนบนพื้นทิ้งทันทีเมื่อศัตรูตาย
         if (currentTelegraphIndicator != null)
         {
             Destroy(currentTelegraphIndicator);
             currentTelegraphIndicator = null;
         }
 
-        // ระบบระเบิดตัวเองตอนตาย เพื่อทำดาเมจใส่ศัตรูรอบข้าง
+        if (healthCanvasObj != null)
+        {
+            healthCanvasObj.SetActive(false);
+        }
+
+        SetRendererColor(preDeathColor);
+
+        if (customExplosionSound != null)
+        {
+            AudioSource.PlayClipAtPoint(customExplosionSound, transform.position, explosionVolume);
+        }
+        else if (SoundManager.Instance != null)
+        {
+            SoundManager.Instance.PlayEnemyDie(transform.position);
+        }
+
+        Vector3 originalPos = transform.position;
+        float elapsed = 0f;
+
+        while (elapsed < deathDelay)
+        {
+            elapsed += Time.deltaTime;
+
+            transform.position = originalPos + new Vector3(
+                Random.Range(-shakeMagnitude, shakeMagnitude),
+                0f,
+                Random.Range(-shakeMagnitude, shakeMagnitude)
+            );
+
+            yield return null;
+        }
+
+        transform.position = originalPos;
+
         if (enableDeathExplosion)
         {
             Collider[] colliders = Physics.OverlapSphere(transform.position, deathExplosionRadius);
@@ -321,11 +418,6 @@ public class EnemyBase : MonoBehaviour
                     nearbyEnemy.TakeDamage(deathExplosionDamage, nearbyEnemy.transform.position, (nearbyEnemy.transform.position - transform.position).normalized);
                 }
             }
-        }
-
-        if (SoundEffects.Instance != null)
-        {
-            SoundEffects.Instance.PlayEnemyDie();
         }
 
         SpawnDeathEffect();
@@ -340,6 +432,12 @@ public class EnemyBase : MonoBehaviour
 
     private void SpawnDeathEffect()
     {
+        if (deathExplosionPrefab != null)
+        {
+            Instantiate(deathExplosionPrefab, transform.position, Quaternion.identity);
+            return;
+        }
+
         GameObject explosionObj = new GameObject("DeathExplosion");
         explosionObj.transform.position = transform.position;
 
@@ -425,7 +523,6 @@ public class EnemyBase : MonoBehaviour
         }
     }
 
-    // ฟังก์ชันรับค่าสโลว์จาก BouncingBall เมื่อลูกบอลน้ำแข็งพุ่งชน
     public void ApplySlowEffect(float slowFactor, float duration)
     {
         if (!isSlowed)
@@ -456,7 +553,6 @@ public class EnemyBase : MonoBehaviour
         isBeingPulled = pulled;
     }
 
-    // วาดเส้นขอบวงกลมแสดงรัศมีระเบิดตอนตายใน Scene View
     private void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.red;

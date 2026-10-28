@@ -140,7 +140,7 @@ MonoBehaviour:
   explosionDamage: 80
   explodeOnlyOnEnemy: 0
   splitCount: 2
-  splitDuration: 5
+  splitDuration: 15
 --- !u!135 &147392440792018637
 SphereCollider:
   m_ObjectHideFlags: 0

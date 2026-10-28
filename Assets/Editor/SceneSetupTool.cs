@@ -174,6 +174,7 @@ public static class SceneSetupTool
         if (GameObject.Find("SoundEffectsManager") == null)
         {
             GameObject sfx = new GameObject("SoundEffectsManager");
+            sfx.AddComponent<SoundManager>();
             sfx.AddComponent<SoundEffects>();
         }
 

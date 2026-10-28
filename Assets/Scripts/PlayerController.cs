@@ -26,6 +26,11 @@ public class PlayerController : MonoBehaviour
     private float dashTimer = 0f;
     private Vector3 dashDir = Vector3.forward;
 
+    [Header("Dash Lightning Effect")]
+    public bool enableDashLightning = true;
+    public Color dashLightningColor = new Color(0.2f, 0.8f, 1f, 1f);
+    private Vector3 lastDashTrailPos;
+
     [Header("Ball Magnet & Aim Skill")]
     public float magnetPullSpeed = 35f;
     public float maxMagnetDistance = 6f;
@@ -51,6 +56,11 @@ public class PlayerController : MonoBehaviour
     public float swingCooldown = 0.28f;
     public float hitForce = 32f;
 
+    [Header("Hit Cone Indicator Visual (Press V to Toggle)")]
+    public bool showHitConeVisual = true;
+    public Color hitConeColor = new Color(1f, 0.5f, 0f, 0.6f);
+    private LineRenderer hitConeLine;
+
     [Header("Visual Elements")]
     public Transform batTransform;
     public Transform modelTransform;
@@ -66,6 +76,27 @@ public class PlayerController : MonoBehaviour
     private bool isDead = false;
     public bool IsDead => isDead;
 
+    [Header("Player Audio Settings")]
+    [Tooltip("เสียงมอเตอร์โดรนฮัมตอนเคลื่อนที่ (Loop)")]
+    public AudioClip hoverEngineSound;
+    [Tooltip("เสียงพ่นไอพ่นตอน Dash")]
+    public AudioClip dashSound;
+    [Tooltip("เสียงชอร์ตไฟฟ้าตอนโดนดาเมจ")]
+    public AudioClip playerHurtSound;
+    [Tooltip("เสียงชอร์ตไฟฟ้าแรงสูงตอนผู้เล่นตาย")]
+    public AudioClip playerDeathSound;
+    [Tooltip("เสียงฟาดอากาศตอนเหวี่ยงไม้")]
+    public AudioClip swingSound;
+    [Tooltip("เสียงเหล็กกระแทกบอลตอนหวดโดน")]
+    public AudioClip hitBallSound;
+    [Tooltip("เสียงคลื่นแม่เหล็กไฟฟ้าตอนใช้สกิลดูดบอล")]
+    public AudioClip magnetSkillSound;
+    [Range(0f, 2f)]
+    public float playerAudioVolume = 1.0f;
+
+    private AudioSource hoverAudioSource;
+    private AudioSource actionAudioSource;
+
     private void Awake()
     {
         currentPlayerHealth = maxPlayerHealth;
@@ -76,6 +107,33 @@ public class PlayerController : MonoBehaviour
         }
         SetupTrajectoryLine();
         SetupRangeIndicatorLine();
+        SetupHitConeLine();
+        SetupAudioSources();
+    }
+
+    private void SetupAudioSources()
+    {
+        hoverAudioSource = gameObject.AddComponent<AudioSource>();
+        hoverAudioSource.spatialBlend = 0.5f;
+        hoverAudioSource.loop = true;
+        hoverAudioSource.volume = playerAudioVolume;
+
+        if (hoverEngineSound != null)
+        {
+            hoverAudioSource.clip = hoverEngineSound;
+            hoverAudioSource.Play();
+        }
+
+        actionAudioSource = gameObject.AddComponent<AudioSource>();
+        actionAudioSource.spatialBlend = 0.5f;
+    }
+
+    private void PlayPlayerAudio(AudioClip clip)
+    {
+        if (clip != null && actionAudioSource != null)
+        {
+            actionAudioSource.PlayOneShot(clip, playerAudioVolume);
+        }
     }
 
     private void Start()
@@ -213,9 +271,13 @@ public class PlayerController : MonoBehaviour
         currentPlayerHealth = Mathf.Max(0, currentPlayerHealth - damageAmount);
         UpdatePlayerHealthUI();
 
-        if (SoundEffects.Instance != null)
+        if (playerHurtSound != null)
         {
-            SoundEffects.Instance.PlayPlayerHurt();
+            PlayPlayerAudio(playerHurtSound);
+        }
+        else if (SoundManager.Instance != null)
+        {
+            SoundManager.Instance.PlayPlayerHurt();
         }
 
         if (currentPlayerHealth <= 0f)
@@ -257,9 +319,15 @@ public class PlayerController : MonoBehaviour
 
         StopMagnet();
 
-        if (SoundEffects.Instance != null)
+        if (hoverAudioSource != null) hoverAudioSource.Stop();
+
+        if (playerDeathSound != null)
         {
-            SoundEffects.Instance.PlayPlayerDeath();
+            PlayPlayerAudio(playerDeathSound);
+        }
+        else if (SoundManager.Instance != null)
+        {
+            SoundManager.Instance.PlayPlayerDeath();
         }
 
         Collider col = GetComponent<Collider>();
@@ -309,13 +377,44 @@ public class PlayerController : MonoBehaviour
         rangeIndicatorLine.endColor = indicatorColor;
     }
 
+    private void SetupHitConeLine()
+    {
+        GameObject coneObj = new GameObject("HitConeIndicator");
+        hitConeLine = coneObj.AddComponent<LineRenderer>();
+        hitConeLine.startWidth = 0.12f;
+        hitConeLine.endWidth = 0.12f;
+        hitConeLine.useWorldSpace = true;
+
+        Shader lineShader = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default");
+        Material lineMat = new Material(lineShader);
+
+        if (lineMat.HasProperty("_BaseColor")) lineMat.SetColor("_BaseColor", hitConeColor);
+        if (lineMat.HasProperty("_Color")) lineMat.SetColor("_Color", hitConeColor);
+
+        hitConeLine.material = lineMat;
+        hitConeLine.startColor = hitConeColor;
+        hitConeLine.endColor = hitConeColor;
+    }
+
     private void Update()
     {
         if (isDead)
         {
             if (trajectoryLine != null) trajectoryLine.positionCount = 0;
             if (rangeIndicatorLine != null) rangeIndicatorLine.enabled = false;
+            if (hitConeLine != null) hitConeLine.enabled = false;
             return;
+        }
+
+        bool toggleVPressed = false;
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current != null && Keyboard.current.vKey.wasPressedThisFrame) toggleVPressed = true;
+#endif
+        if (Input.GetKeyDown(KeyCode.V)) toggleVPressed = true;
+
+        if (toggleVPressed)
+        {
+            showHitConeVisual = !showHitConeVisual;
         }
 
         ReadInput();
@@ -338,6 +437,7 @@ public class PlayerController : MonoBehaviour
 
         HandleBatAnimation();
         UpdateRangeIndicatorVisual();
+        UpdateHitConeVisual();
 
         if (CheckHitAction() && Time.time >= lastSwingTime + swingCooldown && !isDashing)
         {
@@ -400,6 +500,16 @@ public class PlayerController : MonoBehaviour
         dashTimer = 0f;
         lastDashTime = Time.time;
         dashDir = moveInput.sqrMagnitude > 0.01f ? moveInput : transform.forward;
+        lastDashTrailPos = transform.position;
+
+        if (dashSound != null)
+        {
+            PlayPlayerAudio(dashSound);
+        }
+        else if (SoundManager.Instance != null)
+        {
+            SoundManager.Instance.PlayDash();
+        }
 
         if (isAttractingBall && !HasBallAttached)
         {
@@ -417,18 +527,33 @@ public class PlayerController : MonoBehaviour
             Vector3 origin = transform.position + Vector3.up * 0.5f;
             bool isBlocked = false;
 
-            if (Physics.SphereCast(origin, playerRadius, dashDir, out RaycastHit hit, dashDistance + 0.1f))
+            RaycastHit[] hits = Physics.SphereCastAll(origin, playerRadius, dashDir, dashDistance + 0.1f);
+            foreach (var hit in hits)
             {
                 if (hit.collider.transform != transform &&
                     (targetMagnetBall == null || hit.collider.transform != targetMagnetBall.transform))
                 {
-                    isBlocked = true;
+                    EnemyBase enemyCheck = hit.collider.GetComponentInParent<EnemyBase>() ?? hit.collider.GetComponent<EnemyBase>();
+                    if (enemyCheck == null)
+                    {
+                        isBlocked = true;
+                        break;
+                    }
                 }
             }
 
             if (!isBlocked)
             {
+                Vector3 oldPos = transform.position;
                 transform.position += dashDir * dashDistance;
+
+                if (enableDashLightning && Vector3.Distance(oldPos, transform.position) > 0.15f)
+                {
+                    GameObject lightningObj = new GameObject("DashLightning");
+                    DashLightningEffect lEffect = lightningObj.AddComponent<DashLightningEffect>();
+                    lEffect.Init(oldPos + Vector3.up * 0.5f, transform.position + Vector3.up * 0.5f, dashLightningColor);
+                    lastDashTrailPos = transform.position;
+                }
             }
             else
             {
@@ -472,6 +597,16 @@ public class PlayerController : MonoBehaviour
                 transform.position += moveDir * moveDistance;
             }
         }
+
+        float targetEnginePitch = (moveInput.sqrMagnitude > 0.01f) ? 1.15f : 1.0f;
+        if (hoverAudioSource != null && hoverAudioSource.isPlaying)
+        {
+            hoverAudioSource.pitch = Mathf.Lerp(hoverAudioSource.pitch, targetEnginePitch, 6f * Time.deltaTime);
+        }
+        if (SoundManager.Instance != null)
+        {
+            SoundManager.Instance.SetHoverEnginePitch(targetEnginePitch);
+        }
     }
 
     private void HandleAiming()
@@ -510,7 +645,6 @@ public class PlayerController : MonoBehaviour
 
     private void HandleMagnetSkill()
     {
-        // 🌟 [ระบบป้องกันบัค]: รีเซ็ตสถานะหากบอลเป้าหมายหายไปหรือถูกทำลายระหว่างดูด
         if (isAttractingBall && targetMagnetBall == null)
         {
             isAttractingBall = false;
@@ -544,6 +678,15 @@ public class PlayerController : MonoBehaviour
                 isAttractingBall = true;
                 lastMagnetTime = Time.time;
                 targetMagnetBall.StartMagnetPull();
+
+                if (magnetSkillSound != null)
+                {
+                    PlayPlayerAudio(magnetSkillSound);
+                }
+                else if (SoundManager.Instance != null)
+                {
+                    SoundManager.Instance.PlayMagnetSkill();
+                }
             }
         }
 
@@ -595,6 +738,43 @@ public class PlayerController : MonoBehaviour
         {
             rangeIndicatorLine.enabled = false;
         }
+    }
+
+    private void UpdateHitConeVisual()
+    {
+        if (hitConeLine == null) return;
+
+        if (!showHitConeVisual)
+        {
+            hitConeLine.enabled = false;
+            return;
+        }
+
+        hitConeLine.enabled = true;
+        hitConeLine.startColor = hitConeColor;
+        hitConeLine.endColor = hitConeColor;
+        if (hitConeLine.material.HasProperty("_BaseColor")) hitConeLine.material.SetColor("_BaseColor", hitConeColor);
+        if (hitConeLine.material.HasProperty("_Color")) hitConeLine.material.SetColor("_Color", hitConeColor);
+
+        int segments = 21;
+        Vector3 centerPos = transform.position + Vector3.up * 0.05f;
+        Vector3 forward = transform.forward;
+        float halfAngle = hitAngle * 0.5f;
+
+        Vector3[] points = new Vector3[segments + 2];
+        points[0] = centerPos;
+
+        for (int i = 0; i <= segments; i++)
+        {
+            float currentAngle = -halfAngle + (hitAngle * (i / (float)segments));
+            Quaternion rot = Quaternion.Euler(0, currentAngle, 0);
+            Vector3 dir = rot * forward;
+            points[i + 1] = centerPos + dir * hitRadius;
+        }
+        points[segments + 1] = centerPos;
+
+        hitConeLine.positionCount = points.Length;
+        hitConeLine.SetPositions(points);
     }
 
     private void StopMagnet()
@@ -662,40 +842,65 @@ public class PlayerController : MonoBehaviour
         isSwinging = true;
         swingAnimationTimer = 0f;
 
-        if (SoundEffects.Instance != null) SoundEffects.Instance.PlaySwing();
+        if (swingSound != null)
+        {
+            PlayPlayerAudio(swingSound);
+        }
+        else if (SoundManager.Instance != null)
+        {
+            SoundManager.Instance.PlaySwing();
+        }
+
         SpawnSwingSlashEffect();
+
+        bool hitSomething = false;
 
         if (HasBallAttached && targetMagnetBall != null)
         {
             targetMagnetBall.HitByPlayer(transform.forward, hitForce);
             StopMagnet();
-            return;
+            hitSomething = true;
         }
-
-        BouncingBall[] balls = FindObjectsByType<BouncingBall>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        BouncingBall targetBall = null;
-        float closestDist = float.MaxValue;
-
-        foreach (var ball in balls)
+        else
         {
-            Vector3 toBall = ball.transform.position - transform.position;
-            toBall.y = 0;
-            float dist = toBall.magnitude;
+            BouncingBall[] balls = FindObjectsByType<BouncingBall>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            BouncingBall targetBall = null;
+            float closestDist = float.MaxValue;
 
-            if (dist <= hitRadius)
+            foreach (var ball in balls)
             {
-                float angle = Vector3.Angle(transform.forward, toBall);
-                if (angle <= hitAngle * 0.5f && dist < closestDist)
+                Vector3 toBall = ball.transform.position - transform.position;
+                toBall.y = 0;
+                float dist = toBall.magnitude;
+
+                if (dist <= hitRadius)
                 {
-                    closestDist = dist;
-                    targetBall = ball;
+                    float angle = Vector3.Angle(transform.forward, toBall);
+                    if (angle <= hitAngle * 0.5f && dist < closestDist)
+                    {
+                        closestDist = dist;
+                        targetBall = ball;
+                    }
                 }
+            }
+
+            if (targetBall != null)
+            {
+                targetBall.HitByPlayer(transform.forward, hitForce);
+                hitSomething = true;
             }
         }
 
-        if (targetBall != null)
+        if (hitSomething)
         {
-            targetBall.HitByPlayer(transform.forward, hitForce);
+            if (hitBallSound != null)
+            {
+                PlayPlayerAudio(hitBallSound);
+            }
+            else if (SoundManager.Instance != null)
+            {
+                SoundManager.Instance.PlayHitBall(transform.position);
+            }
         }
     }
 

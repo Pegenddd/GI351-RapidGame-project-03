@@ -128,18 +128,30 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 728ed59427080b54282d16a6dc5fc8d7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyBase
-  maxHealth: 200
+  maxHealth: 120
   currentHealth: 0
-  moveSpeed: 12
+  moveSpeed: 10
   attackRange: 1.8
-  attackCooldown: 1
+  attackCooldown: 3
   attackDamage: 5
+  attackRecoveryDelay: 1
+  separationRadius: 3
+  separationWeight: 1.5
+  telegraphDuration: 0.3
+  telegraphBoxSize: 5
   enableDeathExplosion: 1
-  deathExplosionRadius: 4
-  deathExplosionDamage: 50
+  deathExplosionRadius: 6
+  deathExplosionDamage: 80
+  deathDelay: 0.8
+  preDeathColor: {r: 0, g: 0, b: 0, a: 1}
+  shakeMagnitude: 0.08
+  deathExplosionPrefab: {fileID: 8194992990867289339, guid: 99bc28c0d45f51c4fbac01080b73edc7, type: 3}
+  customExplosionSound: {fileID: 0}
+  explosionVolume: 1
   flashColor: {r: 1, g: 1, b: 1, a: 1}
   flashDuration: 0.1
   showHealthBar: 1
+  maxTiltAngle: 12
 --- !u!1001 &7341700877729485287
 PrefabInstance:
   m_ObjectHideFlags: 0

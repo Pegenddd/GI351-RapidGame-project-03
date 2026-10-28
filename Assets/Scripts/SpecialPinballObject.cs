@@ -22,6 +22,8 @@ public class SpecialPinballObject : MonoBehaviour
     public float pullSpeed = 6.0f;
     [Tooltip("ระยะห่างจากศูนย์กลางเสาที่ศัตรูจะหยุดวิ่งเข้าหา (ป้องกันมอนจมเข้าไปในตัวเสา)")]
     public float stopDistance = 1.8f;
+    [Tooltip("ระยะเวลา (วินาที) ที่จะทำการดูดศัตรู ตั้งแต่เริ่มต้นใช้งาน (ถ้าหมดเวลานี้ศัตรูจะหลุดจากการโดนดูด แต่บอลยังหมุนต่อได้)")]
+    public float pullDuration = 2.0f; // 🌟 เพิ่มตัวแปรสำหรับกำหนดเวลาดูดศัตรู
 
     [Header("Explode Settings")]
     public float explosionRadius = 5.0f;
@@ -58,7 +60,6 @@ public class SpecialPinballObject : MonoBehaviour
                 Collider triggerCol = GetComponent<Collider>();
                 if (triggerCol != null) triggerCol.enabled = false;
 
-                // 🌟 ส่ง ball เข้าไปใน Coroutine เพื่อให้เช็คสถานะได้
                 StartCoroutine(ContinuousPullAndDestroyRoutine(ball));
                 break;
 
@@ -79,48 +80,59 @@ public class SpecialPinballObject : MonoBehaviour
     private IEnumerator ContinuousPullAndDestroyRoutine(BouncingBall activeBall)
     {
         float elapsed = 0f;
-        // เก็บรายชื่อศัตรูที่กำลังโดนดึงเพื่อใช้คืนสถานะตอนจบ
         HashSet<EnemyBase> pulledEnemies = new HashSet<EnemyBase>();
 
         while (elapsed < orbitDuration)
         {
-            // 🌟 เช็คว่าลูกบอลยังคงหมุนอยู่รอบเสานี้หรือไม่
             if (activeBall == null || !activeBall.isOrbiting || activeBall.orbitTargetTransform != transform)
             {
-                // ถ้าบอลหลุดออกไปแล้ว ให้หยุดวงจรการดูดทันที (Break ออกจากลูป)
                 break;
             }
 
             elapsed += Time.deltaTime;
 
-            Collider[] colliders = Physics.OverlapSphere(transform.position, pullRadius);
-            foreach (var col in colliders)
+            // 🌟 เช็คว่ายังอยู่ในช่วงเวลาที่อนุญาตให้ดูดศัตรูอยู่หรือไม่ (pullDuration)
+            if (elapsed <= pullDuration)
             {
-                if (col.CompareTag("Enemy") || (col.transform.parent != null && col.transform.parent.CompareTag("Enemy")))
+                Collider[] colliders = Physics.OverlapSphere(transform.position, pullRadius);
+                foreach (var col in colliders)
                 {
-                    EnemyBase enemyBase = col.GetComponentInParent<EnemyBase>() ?? col.GetComponent<EnemyBase>();
-                    if (enemyBase != null)
+                    if (col.CompareTag("Enemy") || (col.transform.parent != null && col.transform.parent.CompareTag("Enemy")))
                     {
-                        // สั่งล็อคไม่ให้ศัตรูเดินเองตาม AI ปกติ
-                        enemyBase.SetPulledState(true);
-                        pulledEnemies.Add(enemyBase);
-
-                        Transform enemyTarget = enemyBase.transform;
-                        float distanceToCenter = Vector3.Distance(enemyTarget.position, transform.position);
-
-                        // ถ้ายังไกลกว่าระยะหยุด ให้ขยับเข้าหาด้วย pullSpeed ที่กำหนด
-                        if (distanceToCenter > stopDistance)
+                        EnemyBase enemyBase = col.GetComponentInParent<EnemyBase>() ?? col.GetComponent<EnemyBase>();
+                        if (enemyBase != null)
                         {
-                            enemyTarget.position = Vector3.MoveTowards(enemyTarget.position, transform.position, pullSpeed * Time.deltaTime);
+                            enemyBase.SetPulledState(true);
+                            pulledEnemies.Add(enemyBase);
+
+                            Transform enemyTarget = enemyBase.transform;
+                            float distanceToCenter = Vector3.Distance(enemyTarget.position, transform.position);
+
+                            if (distanceToCenter > stopDistance)
+                            {
+                                enemyTarget.position = Vector3.MoveTowards(enemyTarget.position, transform.position, pullSpeed * Time.deltaTime);
+                            }
                         }
                     }
                 }
+            }
+            else
+            {
+                // ถ้าหมดเวลาดูดแล้ว แต่ศัตรูยังถูกล็อคสถานะอยู่ ให้คืนอิสระในการเดินก่อนครบเวลาบอลหลุด
+                foreach (var enemy in pulledEnemies)
+                {
+                    if (enemy != null)
+                    {
+                        enemy.SetPulledState(false);
+                    }
+                }
+                pulledEnemies.Clear();
             }
 
             yield return null;
         }
 
-        // เมื่อหมดเวลาดึงดูด หรือลูกบอลหลุดออกไปแล้ว คืนสถานะการเดินปกติให้ศัตรูทั้งหมดที่เคยโดนดึง
+        // คืนสถานะการเดินปกติให้ศัตรูทั้งหมดที่ยังค้างอยู่ตอนจบ
         foreach (var enemy in pulledEnemies)
         {
             if (enemy != null)
@@ -129,7 +141,6 @@ public class SpecialPinballObject : MonoBehaviour
             }
         }
 
-        // ทำลายเสาทิ้งเมื่อจบการทำงาน
         Destroy(gameObject);
     }
 

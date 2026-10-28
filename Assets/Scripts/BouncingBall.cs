@@ -61,7 +61,8 @@ public class BouncingBall : MonoBehaviour
         if (rb != null)
         {
             rb.useGravity = false;
-            rb.isKinematic = true;
+            rb.isKinematic = false; // 🌟 เปิดให้ Rigidbody ทำงานร่วมกับระบบฟิสิกส์และการชน
+            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic; // 🌟 ป้องกันไม่ให้ทะลุกำแพงเมื่อเคลื่อนที่ด้วยความเร็วสูง
         }
 
         ballRenderer = GetComponent<Renderer>();
@@ -100,7 +101,15 @@ public class BouncingBall : MonoBehaviour
         {
             if (playerTransform != null)
             {
-                transform.position = playerTransform.position + playerTransform.forward * 1.2f + Vector3.up * 0.6f;
+                Vector3 targetPos = playerTransform.position + playerTransform.forward * 1.2f + Vector3.up * 0.6f;
+                if (rb != null && !rb.isKinematic)
+                {
+                    rb.MovePosition(targetPos);
+                }
+                else
+                {
+                    transform.position = targetPos;
+                }
             }
             return;
         }
@@ -126,7 +135,16 @@ public class BouncingBall : MonoBehaviour
             float rad = orbitAngle * Mathf.Deg2Rad;
             float x = orbitTargetTransform.position.x + Mathf.Cos(rad) * orbitRadius;
             float z = orbitTargetTransform.position.z + Mathf.Sin(rad) * orbitRadius;
-            transform.position = new Vector3(x, 0.6f, z);
+            Vector3 orbitPos = new Vector3(x, 0.6f, z);
+
+            if (rb != null && !rb.isKinematic)
+            {
+                rb.MovePosition(orbitPos);
+            }
+            else
+            {
+                transform.position = orbitPos;
+            }
 
             orbitDamageTimer += Time.deltaTime;
             if (orbitDamageTimer >= 0.2f)
@@ -152,7 +170,16 @@ public class BouncingBall : MonoBehaviour
         }
 
         Vector3 moveDelta = moveDirection * (currentSpeed * Time.deltaTime);
-        transform.position += moveDelta;
+
+        // 🌟 เปลี่ยนมาใช้ rb.MovePosition เพื่อให้ระบบ Physics ตรวจสอบการชนและกันการทะลุกำแพง
+        if (rb != null && !rb.isKinematic)
+        {
+            rb.MovePosition(rb.position + moveDelta);
+        }
+        else
+        {
+            transform.position += moveDelta;
+        }
 
         Vector3 pos = transform.position;
         pos.y = 0.6f;
@@ -233,11 +260,21 @@ public class BouncingBall : MonoBehaviour
         storedSlowFactor = slowFactor;
         storedSlowDuration = duration;
         UpdateVisuals();
+
+        if (SoundManager.Instance != null)
+        {
+            SoundManager.Instance.PlayIceEffect(transform.position);
+        }
     }
 
     private void TriggerExplosion(Vector3 hitPoint)
     {
         SpawnExplosionEffect(hitPoint);
+
+        if (SoundManager.Instance != null)
+        {
+            SoundManager.Instance.PlayBallExplode(hitPoint);
+        }
 
         Collider[] colliders = Physics.OverlapSphere(hitPoint, explosionRadius);
         foreach (var col in colliders)
@@ -302,7 +339,7 @@ public class BouncingBall : MonoBehaviour
         float radius = transform.localScale.x * 0.5f;
 
         RaycastHit hit;
-        if (Physics.SphereCast(transform.position, radius, moveDirection, out hit, moveDelta.magnitude + 0.15f))
+        if (Physics.SphereCast(transform.position, radius, moveDirection, out hit, moveDelta.magnitude + 0.3f))
         {
             SpecialPinballObject specialObj = hit.collider.GetComponentInParent<SpecialPinballObject>() ?? hit.collider.GetComponent<SpecialPinballObject>();
             if (specialObj != null)
@@ -446,8 +483,12 @@ public class BouncingBall : MonoBehaviour
 
     private void PlayBounceEffect(Vector3 hitPoint)
     {
-        if (SoundEffects.Instance != null) SoundEffects.Instance.PlayBounce();
         SpawnSpark(hitPoint);
+
+        if (SoundManager.Instance != null)
+        {
+            SoundManager.Instance.PlayBounce(hitPoint);
+        }
 
         if (CameraController.Instance != null)
         {
@@ -466,8 +507,12 @@ public class BouncingBall : MonoBehaviour
         currentSpeed = (customForce > 0f) ? customForce : boostedSpeed;
         UpdateVisuals();
 
-        if (SoundEffects.Instance != null) SoundEffects.Instance.PlayHitBall();
         SpawnSpark(transform.position);
+
+        if (SoundManager.Instance != null)
+        {
+            SoundManager.Instance.PlayHighSpeedBoost(transform.position);
+        }
 
         if (CameraController.Instance != null)
         {

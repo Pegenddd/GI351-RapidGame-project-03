@@ -148,7 +148,11 @@ public class EnemyController : MonoBehaviour
         SpawnDamageNumber(damageAmount, hitPoint);
 
         // Sound effect
-        if (SoundEffects.Instance != null)
+        if (SoundManager.Instance != null)
+        {
+            SoundManager.Instance.PlayEnemyHurt(hitPoint);
+        }
+        else if (SoundEffects.Instance != null)
         {
             SoundEffects.Instance.PlayEnemyHurt();
         }
@@ -238,7 +242,11 @@ public class EnemyController : MonoBehaviour
     {
         isDead = true;
 
-        if (SoundEffects.Instance != null)
+        if (SoundManager.Instance != null)
+        {
+            SoundManager.Instance.PlayEnemyDie(transform.position);
+        }
+        else if (SoundEffects.Instance != null)
         {
             SoundEffects.Instance.PlayEnemyDie();
         }

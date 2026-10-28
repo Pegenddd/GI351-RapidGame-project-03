@@ -21,6 +21,11 @@ public class PinballBumper : MonoBehaviour
     // ฟังก์ชันรับคำสั่งเปลี่ยนสีจากลูกบอล
     public void OnHitByBall()
     {
+        if (SoundManager.Instance != null)
+        {
+            SoundManager.Instance.PlayBumperHit(transform.position);
+        }
+
         StopAllCoroutines();
         StartCoroutine(FlashColorRoutine());
     }
